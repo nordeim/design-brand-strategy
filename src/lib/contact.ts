@@ -43,6 +43,26 @@ export const BUDGET_LABELS: Record<(typeof BUDGET_RANGES)[number], string> = {
   "not-sure": "Not sure yet",
 };
 
+/** Referral sources — a select on the contact form (source-site parity). */
+export const REFERRAL_OPTIONS = [
+  "referral",
+  "social-media",
+  "search-engine",
+  "press-publication",
+  "other",
+] as const;
+
+export type ReferralSource = (typeof REFERRAL_OPTIONS)[number];
+
+/** Display labels for the referral options — lives beside the enum it labels. */
+export const REFERRAL_LABELS: Record<ReferralSource, string> = {
+  referral: "Referral",
+  "social-media": "Social Media",
+  "search-engine": "Search Engine",
+  "press-publication": "Press / Publication",
+  other: "Other",
+};
+
 export const contactSchema = z.object({
   name: z
     .string()

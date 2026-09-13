@@ -7,17 +7,15 @@ import { Reveal } from "@/components/reveal";
 import { ArrowLink, Container, SectionLabel } from "@/components/ui";
 import { getNextProject, getProject, PROJECTS } from "@/data/projects";
 
-/** Cover render classes per project aspect — the case hero follows the cover's rhythm. */
-const COVER_ASPECT_CLASS = {
-  landscape: "aspect-[8/5]",
-  portrait: "aspect-[3/4]",
-} as const;
+/** Case hero renders as a uniform 7:3 wide banner (source-measured:
+ * every case hero is 2.33, object-cropped from the cover). */
+const COVER_ASPECT_CLASS = "aspect-[7/3]";
 
-/** Detail render classes per detail aspect — wide banners, landscape, portrait studies. */
+/** Detail render classes — wide banners, landscape, and 4:5 portrait studies. */
 const DETAIL_ASPECT_CLASS = {
   wide: "aspect-[7/3]",
   landscape: "aspect-[3/2]",
-  portrait: "aspect-[3/4]",
+  portrait: "aspect-[4/5]",
 } as const;
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -87,9 +85,9 @@ export default async function ProjectPage({ params }: PageProps) {
             src={project.cover}
             alt={project.coverAlt}
             width={project.coverAspect === "portrait" ? 864 : 1344}
-            height={project.coverAspect === "portrait" ? 1152 : 840}
+            height={project.coverAspect === "portrait" ? 1080 : 576}
             priority
-            className={`${COVER_ASPECT_CLASS[project.coverAspect]} w-full object-cover`}
+            className={`${COVER_ASPECT_CLASS} w-full object-cover`}
           />
         </Reveal>
       </Container>
@@ -140,7 +138,7 @@ export default async function ProjectPage({ params }: PageProps) {
                     width={detail.aspect === "portrait" ? 864 : 1344}
                     height={
                       detail.aspect === "portrait"
-                        ? 1152
+                        ? 1080
                         : detail.aspect === "wide"
                           ? 576
                           : 896

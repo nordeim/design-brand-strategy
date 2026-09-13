@@ -10,7 +10,7 @@ last_updated: 2026-09-13
 
 Editorial portfolio website for a designer & brand strategist persona — an original implementation of the reference site's information architecture and design language. Maintained by nordeim; pushed to `git@github.com:nordeim/design-brand-strategy.git`.
 
-**Tech stack**: Next.js 16 (App Router), React 19, TypeScript 5.9 (strict), Tailwind CSS 4 (CSS-first), Vitest 4, zod 3, lucide-react. No database. No auth. Five client components total.
+**Tech stack**: Next.js 16 (App Router), React 19, TypeScript 5.9 (strict), Tailwind CSS 4 (CSS-first), Vitest 4, Playwright 1.62 (e2e), zod 3, lucide-react. No database. No auth. Five client components total.
 
 ## Foundational Principles
 
@@ -20,7 +20,7 @@ Editorial portfolio website for a designer & brand strategist persona — an ori
 2. **PLAN** — Create a structured, sequential execution plan; present it before implementing.
 3. **VALIDATE** — Confirm the plan against the codebase (commands exist, types check, patterns match reality) before writing.
 4. **IMPLEMENT** — Build in logical, testable components; document alongside code.
-5. **VERIFY** — Run `lint → typecheck → test → build` plus a production smoke test before claiming anything works.
+5. **VERIFY** — Run `lint → typecheck → test → build → e2e` plus a production smoke test before claiming anything works.
 6. **DELIVER** — Hand off with evidence: what was verified, what was deferred, what remains.
 
 ### Project-Specific Principles
@@ -83,14 +83,17 @@ Node ≥ 20 / Bun ≥ 1.1. No database, no migrations, no env required to run lo
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run test` | Vitest unit tests |
 | `bun run test:coverage` | Coverage report |
+| `bun run e2e` | Playwright e2e — chromium project against the production build |
+| `bun run e2e:all` | Both projects (chromium + Pixel-7 mobile emulation) |
+| `bun run e2e:report` | Open the Playwright HTML report |
 
 ## Testing Strategy
 
 ### Test Pyramid
 
 - **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema + option labels (`contact.test.ts`), data contracts (project aspect alternation, marquee shapes, process/FAQ data, image-path integrity — `src/data/*.test.ts`), sitemap determinism (`src/app/sitemap.test.ts`), and source-reading markup guards for the no-JS reveal fallback and skip link (`src/lib/reveal-guard.test.ts`).
-- **Integration/API (manual smoke)**: `POST /api/contact` contract (202 valid / 400 invalid with field errors / 429 over-limit) and route health, exercised against `bun run start`.
-- **E2E (not configured)**: add Playwright only when interaction regressions justify the maintenance; the current agent-browser probe scripts cover the same ground on demand.
+- **Integration/API (pinned in e2e)**: the `POST /api/contact` contract (202 valid / 400 invalid with field errors / 429 over-limit with Retry-After) and route health run inside `e2e/contact.spec.ts` against the managed production webServer.
+- **E2E (present — 81 specs)**: Playwright suite in `e2e/` (config adapted from the home-financing reference): `smoke` (critical surfaces + security-header contract + axe critical gates), `seo` (sitemap/robots/title pins/per-case OG), `assets` (data-driven image inventory), `contact` (API contract + form funnel + honeypot), `estimator` (static-group wiring, gated estimate, deep-links), `parity` (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee motion contract, theme persistence), `mobile` (hamburger overlay, scroll lock, Escape focus return). Runs `next start` on :3002 — the shipped artifact, never dev HMR.
 
 ### Test Commands
 
@@ -98,6 +101,7 @@ Node ≥ 20 / Bun ≥ 1.1. No database, no migrations, no env required to run lo
 bun run test                      # all unit tests
 bunx vitest run estimator         # a single file
 bunx vitest run -t "rounds"       # tests matching a name
+bun run build && bun run e2e:all  # full e2e (needs a fresh production build)
 ```
 
 Tests live beside their modules as `*.test.ts`; vitest config resolves `@` → `./src`.

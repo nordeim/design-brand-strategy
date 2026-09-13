@@ -25,34 +25,20 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <>
+      {/* Hero — split layout: label/h1/bio left, portrait right
+          (source geometry: h1 x=80 w=627, portrait x=771 w=429). */}
       <Container className="py-16 md:py-24">
-        <Reveal>
-          <SectionLabel>About</SectionLabel>
-          <h1 className="mt-4 max-w-[20ch] font-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] tracking-tight">
-            The designer your brand will grow into.
-          </h1>
-        </Reveal>
-
-        <div className="mt-14 grid gap-12 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-5">
-            <Reveal variant="card">
-              <Image
-                src="/images/portrait-main.webp"
-                alt="Studio portrait of Elena Vance"
-                width={768}
-                height={1344}
-                priority
-                className="aspect-[4/5] w-full object-cover"
-              />
-              <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                {SITE.name} — {SITE.location}
-              </p>
-            </Reveal>
-          </div>
-
-          <div className="md:col-span-6 md:col-start-7">
+        <div className="grid gap-12 md:grid-cols-12 md:gap-10">
+          <div className="flex flex-col justify-center md:col-span-7">
             <Reveal>
-              <p className="text-base leading-relaxed text-muted-foreground">
+              <SectionLabel>About</SectionLabel>
+              <h1 className="mt-4 max-w-[20ch] font-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] tracking-tight">
+                The designer your brand will grow into.
+              </h1>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <p className="mt-6 text-base leading-relaxed text-muted-foreground">
                 I&apos;m {SITE.name}, a designer and brand strategist working from a small studio
                 in New York. For the last ten years I&apos;ve built identities and systems for
                 companies at every stage — ventures three weeks old defining themselves for the
@@ -72,16 +58,28 @@ export default function AboutPage() {
                 working.
               </p>
             </Reveal>
-            <Reveal delay={80}>
-              <div className="mt-10">
-                <ArrowLink href="/contact">Work with me</ArrowLink>
-              </div>
+          </div>
+
+          <div className="md:col-span-5">
+            <Reveal variant="card">
+              <Image
+                src="/images/portrait-main.webp"
+                alt="Studio portrait of Elena Vance"
+                width={768}
+                height={960}
+                priority
+                className="aspect-[4/5] w-full object-cover"
+              />
+              <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                {SITE.name} — {SITE.location}
+              </p>
             </Reveal>
           </div>
         </div>
       </Container>
 
-      {/* Approach — three numbered principles */}
+      {/* Approach — three principles as a 3-column grid (source geometry:
+          titles side-by-side at x=160/491/821). */}
       <Container className="border-t border-border py-16 md:py-24">
         <Reveal>
           <SectionLabel>Approach</SectionLabel>
@@ -90,17 +88,17 @@ export default function AboutPage() {
           </h2>
         </Reveal>
 
-        <div className="mt-12 space-y-0">
+        <div className="mt-12 grid gap-10 md:grid-cols-3">
           {APPROACH_PRINCIPLES.map((principle, index) => (
             <Reveal key={principle.number} delay={index * 60}>
-              <div className="grid gap-4 border-t border-border py-10 last:border-b md:grid-cols-12 md:gap-8">
-                <span className="text-xs tabular-nums text-muted-foreground md:col-span-1">
+              <div>
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {principle.number}
                 </span>
-                <h3 className="font-serif text-3xl tracking-tight md:col-span-4 md:text-4xl">
+                <h3 className="mt-3 font-serif text-3xl tracking-tight md:text-4xl">
                   {principle.title}
                 </h3>
-                <p className="text-sm leading-relaxed text-muted-foreground md:col-span-7">
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                   {principle.body}
                 </p>
               </div>

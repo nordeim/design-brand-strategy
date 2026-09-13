@@ -107,7 +107,7 @@ export default function ServicesPage() {
       </Container>
 
       {/* ------------------------------------------------------------------
-        How we work together — the four-step engagement process.
+        How we work together — the five-step engagement process.
       ------------------------------------------------------------------ */}
       <Container className="border-t border-border py-16 md:py-24">
         <Reveal>
@@ -117,19 +117,17 @@ export default function ServicesPage() {
           </h2>
         </Reveal>
 
-        <div className="mt-12">
+        {/* Five steps side-by-side — the source renders the process as a
+            horizontal 5-column band (Discovery…Delivery). */}
+        <div className="mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {PROCESS_STEPS.map((step, index) => (
             <Reveal key={step.number} delay={index * 60}>
-              <div className="grid gap-4 border-t border-border py-10 last:border-b md:grid-cols-12 md:gap-8">
-                <span className="text-xs tabular-nums text-muted-foreground md:col-span-1">
-                  {step.number}
-                </span>
-                <h3 className="font-serif text-3xl tracking-tight md:col-span-4 md:text-4xl">
+              <div>
+                <span className="text-xs tabular-nums text-muted-foreground">{step.number}</span>
+                <h3 className="mt-3 font-serif text-2xl tracking-tight md:text-3xl">
                   {step.title}
                 </h3>
-                <p className="text-sm leading-relaxed text-muted-foreground md:col-span-7">
-                  {step.body}
-                </p>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
               </div>
             </Reveal>
           ))}

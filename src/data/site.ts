@@ -229,14 +229,14 @@ export const COMPANY_STAGES: ReadonlyArray<{ id: string; label: string; multipli
 ];
 
 export const TIMELINES: ReadonlyArray<{ id: string; label: string; multiplier: number }> = [
-  { id: "flexible", label: "Flexible", multiplier: 1 },
-  { id: "standard", label: "Standard", multiplier: 1.1 },
-  { id: "accelerated", label: "Accelerated", multiplier: 1.25 },
-  { id: "rush", label: "Rush", multiplier: 1.5 },
+  { id: "flexible", label: "Flexible (12+ weeks)", multiplier: 1 },
+  { id: "standard", label: "Standard (8-12 weeks)", multiplier: 1.1 },
+  { id: "accelerated", label: "Accelerated (6-8 weeks)", multiplier: 1.25 },
+  { id: "rush", label: "Rush (under 6 weeks)", multiplier: 1.5 },
 ];
 
 export const SCOPES: ReadonlyArray<{ id: string; label: string; multiplier: number }> = [
-  { id: "core", label: "Core", multiplier: 0.8 },
+  { id: "core", label: "Core Essentials", multiplier: 0.8 },
   { id: "comprehensive", label: "Comprehensive", multiplier: 1 },
   { id: "full-system", label: "Full System", multiplier: 1.3 },
 ];
@@ -253,7 +253,7 @@ export const PROCESS_STEPS = [
   },
   {
     number: "02",
-    title: "Define",
+    title: "Strategy",
     body: "Strategy before styling. We fix the positioning, the audience, and the decisions the identity must carry, then translate them into a creative brief with named territories. This is where scope, timing, and investment are agreed in writing — the discipline that keeps the design phase fast and the surprises out of it.",
   },
   {
@@ -263,7 +263,12 @@ export const PROCESS_STEPS = [
   },
   {
     number: "04",
-    title: "Deliver",
+    title: "Refinement",
+    body: "The chosen direction meets the real world: edge cases, print proofs, screen sizes, and the hands that will actually use the system. We tighten kerning, resolve contrast at every weight, and stress-test the applications that matter most — because a brand that only works on the presentation slide is not done.",
+  },
+  {
+    number: "05",
+    title: "Delivery",
     body: "Launch is a beginning, not a handoff. Every engagement ships with the asset library, the guidelines written for the people who use them, and a stewardship window while the system meets the real world. The measure of the work is the tenth application made without me in the room.",
   },
 ] as const;

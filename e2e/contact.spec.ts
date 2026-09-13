@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Contact funnel + API contract — the DBS counterpart of
@@ -115,6 +115,10 @@ test.describe("contact API contract", () => {
 });
 
 test.describe("contact form UI", () => {
+  // Scoped to <form>: the estimator's radiogroups also carry aria-labels
+  // ("Project type"), so unscoped getByLabel calls would be ambiguous.
+  const form = (page: Page) => page.locator("form");
+
   test("every field is label-wired and the honeypot is hidden", async ({ page }) => {
     await page.goto("/contact");
     for (const label of [
@@ -126,11 +130,13 @@ test.describe("contact form UI", () => {
       "About the project",
       "How did you find me?",
     ]) {
-      await expect(page.getByLabel(label)).toBeAttached();
+      await expect(form(page).getByLabel(label)).toBeAttached();
     }
-    // Selects must be real comboboxes wired to their labels (C-3 remediation).
-    await expect(page.getByLabel("Project type")).toHaveRole("combobox");
-    await expect(page.getByLabel("Budget")).toHaveRole("combobox");
+    // Selects must be real comboboxes wired to their labels (C-3 remediation) —
+    // referral too (pass-2 parity: source uses a select).
+    await expect(form(page).getByLabel("Project type")).toHaveRole("combobox");
+    await expect(form(page).getByLabel("Budget")).toHaveRole("combobox");
+    await expect(form(page).getByLabel("How did you find me?")).toHaveRole("combobox");
     // Honeypot is positioned far off-screen and excluded from the tab order
     // (Playwright treats off-screen elements as "visible", so assert the
     // actual hiding mechanism: the -9999px offset).
@@ -159,12 +165,12 @@ test.describe("contact form UI", () => {
 
   test("valid submit reaches the API and renders the success state", async ({ page }) => {
     await page.goto("/contact");
-    await page.getByLabel("Name").fill("Jordan Lee");
-    await page.getByLabel("Email").fill(`jordan-${Date.now()}@example.com`);
-    await page.getByLabel("Company").fill("Northbeam Studio");
-    await page.getByLabel("Project type").selectOption("brand-identity");
-    await page.getByLabel("Budget").selectOption("25-50k");
-    await page
+    await form(page).getByLabel("Name").fill("Jordan Lee");
+    await form(page).getByLabel("Email").fill(`jordan-${Date.now()}@example.com`);
+    await form(page).getByLabel("Company").fill("Northbeam Studio");
+    await form(page).getByLabel("Project type").selectOption("brand-identity");
+    await form(page).getByLabel("Budget").selectOption("25-50k");
+    await form(page)
       .getByLabel("About the project")
       .fill("We are repositioning our studio and need a full identity in Q2.");
     await page.getByRole("button", { name: "Send inquiry" }).click();
@@ -181,11 +187,11 @@ test.describe("contact form UI", () => {
       return route.fulfill({ status: 202, contentType: "application/json", body: "{}" });
     });
     await page.goto("/contact");
-    await page.getByLabel("Name").fill("Bot Botsworth");
-    await page.getByLabel("Email").fill("bot@example.com");
-    await page.getByLabel("Project type").selectOption("other");
-    await page.getByLabel("Budget").selectOption("not-sure");
-    await page
+    await form(page).getByLabel("Name").fill("Bot Botsworth");
+    await form(page).getByLabel("Email").fill("bot@example.com");
+    await form(page).getByLabel("Project type").selectOption("other");
+    await form(page).getByLabel("Budget").selectOption("not-sure");
+    await form(page)
       .getByLabel("About the project")
       .fill("Automated filler text long enough to pass validation.");
     await page.locator("#website").fill("http://spam.example");
@@ -207,11 +213,11 @@ test.describe("contact form UI", () => {
       }),
     );
     await page.goto("/contact");
-    await page.getByLabel("Name").fill("Jordan Lee");
-    await page.getByLabel("Email").fill("jordan@example.com");
-    await page.getByLabel("Project type").selectOption("art-direction");
-    await page.getByLabel("Budget").selectOption("50-100k");
-    await page
+    await form(page).getByLabel("Name").fill("Jordan Lee");
+    await form(page).getByLabel("Email").fill("jordan@example.com");
+    await form(page).getByLabel("Project type").selectOption("art-direction");
+    await form(page).getByLabel("Budget").selectOption("50-100k");
+    await form(page)
       .getByLabel("About the project")
       .fill("Campaign art direction retainer starting next quarter.");
     await page.getByRole("button", { name: "Send inquiry" }).click();

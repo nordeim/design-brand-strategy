@@ -9,9 +9,9 @@ description: >
   component architecture, content-as-code data layer, accessibility
   implementation, anti-patterns, debugging procedures, and hard-won lessons
   from the build and every subsequent remediation pass.
-version: 2.0.0
+version: 2.1.0
 last_updated: 2026-09-13
-project_state: 44/44 unit tests green · tsc --noEmit clean · eslint clean · next build 20 routes · main @ post-remediation (see Appendix B)
+project_state: 44/44 unit tests green · 81/81 Playwright e2e specs green · tsc --noEmit clean · eslint clean · next build 20 routes · main @ post-remediation pass 2 (see Appendix B)
 ---
 
 # design-brand-strategy — Engineering SKILL
@@ -32,6 +32,8 @@ project_state: 44/44 unit tests green · tsc --noEmit clean · eslint clean · n
 > - **Anything about colors, spacing, z-index, breakpoints, image aspects?** §17–§19 + §4.5. Do not guess.
 >
 > **v2.0.0 change log:** documents the codebase after remediation pass 1 (2026-09-13 audit → fix cycle): mixed-aspect editorial image rhythm (ADR-008), fail-open no-JS reveal guards (ADR-007), WebP assets (ADR-006 revision), services process/FAQ/CTA sections, skip link + select-error a11y wiring, estimator DRY refactor, per-page OG images, deterministic sitemap stamps. New lessons L9–L12; audit history in Appendix B.
+>
+> **v2.1.0 change log:** adds the Playwright e2e layer (ADR-009, 81 specs) and the pass-2 parity redesign (ADR-010): static four-group estimator with gated estimate, /work closing CTA band, portrait 4:5 + uniform 7:3 case heroes, 3-column home-services and about-approach grids, text-left/portrait-right home/about heroes, 5-step horizontal process, minimal card meta grammar, source-range marquee shapes, single-column contact fields (form left / info right), referral select, timeline labels with durations. New lesson L13.
 
 ## Table of Contents
 
@@ -65,8 +67,9 @@ project_state: 44/44 unit tests green · tsc --noEmit clean · eslint clean · n
 
 **One sentence.** An editorial portfolio site for an independent designer and
 brand strategist ("Elena Vance", New York) — a five-page marketing site with a
-four-step investment estimator and a validated contact form, built as a fully
-static Next.js 16 application with two API routes.
+static four-group investment estimator (gated estimate) and a validated
+contact form, built as a fully static Next.js 16 application with two API
+routes, verified by 44 unit tests and an 81-spec Playwright e2e suite.
 
 **The design thesis: warm editorial print.** The site behaves like a
 well-set magazine: a cream paper background, near-black ink, a display serif
@@ -98,17 +101,18 @@ likely to violate, in rough order of likelihood:
    (`tracking-[0.18em]`–`[0.22em]`) for the "wayfinding" voice.
 5. **Editorial numbering everywhere.** Lists are numbered `01 / 02 / 03` in
    `tabular-nums` muted text — services, approach principles, mobile nav,
-   estimator steps. Projects on index pages carry `00`-padded indices.
+   and the estimator's four groups (1 Project type … 4 Deliverables).
 6. **Motion budget: one marquee + reveals + hover nudges.** Nothing else.
    No parallax, no scroll-jacking, no transform cascades. CSS-only
    (zero animation libraries — no Framer Motion by explicit decision).
 7. **Images are content, not decoration — and their orientation is data.**
    Fixed aspect ratios with `object-cover`, real alt text on every content
    image, captions in the muted uppercase label voice. Covers alternate
-   landscape `aspect-[8/5]` and portrait `aspect-[3/4]` (the mixed editorial
-   rhythm, ADR-008); case details mix wide `aspect-[7/3]`, landscape
-   `aspect-[3/2]`, and portrait studies; the marquee renders
-   tall/wide/landscape/square shapes. Orientation lives in the data layer
+   landscape `aspect-[8/5]` and portrait `aspect-[4/5]` (the mixed editorial
+   rhythm, ADR-008); every case hero is a uniform `aspect-[7/3]` wide banner;
+   case details mix wide `aspect-[7/3]`, landscape `aspect-[3/2]`, and
+   portrait studies; the marquee renders tall/wide/landscape/square shapes.
+   Orientation lives in the data layer
    (`coverAspect`, `details[].aspect`, marquee `shape`), never in ad-hoc
    component classes.
 
@@ -133,7 +137,8 @@ portfolio you can almost feel.
 
 **What this project deliberately is NOT:** no database (ADR-002), no auth,
 no CMS, no animation library, no component library (no shadcn/Radix), no
-analytics, no i18n, no tests beyond pure-function unit tests, no Docker.
+analytics, no i18n, no Docker. (Testing, by contrast, is deliberately
+rich: 44 unit tests + an 81-spec Playwright e2e suite — ADR-009.)
 See Appendix A for the rationale of each.
 
 ---
@@ -153,7 +158,8 @@ lockfile). **Never downgrade or float these without re-running the full
 | Validation | `zod` | **3.25.76** | One schema (`contactSchema`) enforced at two boundaries (client inline + API authoritative) — ADR-004. |
 | Icons | `lucide-react` | **1.45.0** | Only `Menu`, `X`, `Sun`, `Moon`, `ArrowRight`, `ChevronDown` are used. Tree-shaken; no icon fonts. |
 | Language | `typescript` | **5.9.3** | `strict: true`, `noEmit`, `moduleResolution: "bundler"`, path alias `@/* → ./src/*`. |
-| Tests | `vitest` | **4.1.11** | `environment: "node"`, includes `src/**/*.test.ts`. 44 tests / 6 files — pure functions, data contracts, and source-reading guards. No jsdom, no E2E runner in this repo. |
+| Tests | `vitest` | **4.1.11** | `environment: "node"`, includes `src/**/*.test.ts`. 44 tests / 6 files — pure functions, data contracts, and source-reading guards. No jsdom. |
+| E2E | `@playwright/test` | **1.62.0** | 81 specs in `e2e/` (7 files) + `@axe-core/playwright` 4.13.0. Chromium + Pixel-7 projects against the production build (`next start` :3002). Pinned to 1.62.0 to match the cached Chromium 151; bun.lock locks it. |
 | Lint | `eslint` + `eslint-config-next` | **9.39.5** / 16.3.4 | Flat config (`eslint.config.mjs`) extending `eslint-config-next/core-web-vitals`. |
 | Package manager | bun | (host) | `bun install`, `bun run <script>`. `trustedDependencies: ["unrs-resolver"]` — the only postinstall allowed to run. |
 | Database | — | — | None by decision (ADR-002). Content is TypeScript data files. |
@@ -204,9 +210,11 @@ Quality gates (the only commands you ever need — all wired in `package.json`):
 
 ```bash
 bun run lint        # eslint .            — flat config, core-web-vitals
-bun run typecheck   # tsc --noEmit        — strict
+bun run typecheck   # tsc --noEmit        — strict (covers e2e/ specs too)
 bun run test        # vitest run          — 44 tests, node environment
 bun run build       # next build          — 20 routes
+bun run e2e         # playwright chromium — 76 specs against the built artifact
+bun run e2e:all     # + Pixel-7 mobile    — 81 specs total (serial workers)
 bun run start       # next start          — prod server (use -p 3001 when 3000 is busy)
 ```
 
@@ -218,8 +226,9 @@ bun run start       # next start          — prod server (use -p 3001 when 3000
 | `tsconfig.json` | strict TS, `@/*` alias, excludes `skills/` | `incremental: true` → `.tsbuildinfo` appears; it is gitignored. |
 | `eslint.config.mjs` | Flat config on `eslint-config-next/core-web-vitals`; global-ignores `.next/**`, `out/**`, `build/**`, `next-env.d.ts`, `skills/**`, `infrastructure/**` | The `react-hooks` rules here are strict about set-state-in-effect; two real refactors were forced by them (lesson L4). |
 | `vitest.config.ts` | `@` alias mirrored, node env, `src/**/*.test.ts` | No jsdom — tests import pure functions only; do not add DOM-touching tests without adding an environment. |
+| `playwright.config.ts` | testDir `e2e/`, serial workers, chromium + Pixel-7 projects, managed `next start` webServer on :3002 (`E2E_PORT`/`E2E_BASE_URL` overridable) | Runs the PRODUCTION build — run `bun run build` first, and beware `reuseExistingServer: true` picking up a stale server. With `javaScriptEnabled: false` locators cannot resolve — no-JS specs assert through `page.evaluate`. |
 | `postcss.config.mjs` | Single `@tailwindcss/postcss` plugin | Tailwind 4 has no config file to point at; tokens live in CSS. |
-| `.env.example` | Documents `NEXT_PUBLIC_SITE_URL` | Public var — never put secrets in it. |
+| `.env.example` | Documents `NEXT_PUBLIC_SITE_URL` + optional `E2E_PORT` / `E2E_BASE_URL` | Public vars — never put secrets in it. |
 
 **Fonts** are loaded in `src/app/layout.tsx` via `next/font/google`:
 `Instrument_Serif` (weight `400`, styles `normal`+`italic`, CSS variable
@@ -367,14 +376,15 @@ Beyond Tailwind utilities, `globals.css` defines exactly three things:
 
 | Context | Aspect | Class | Source files |
 |---|---|---|---|
-| Landscape covers (grids, case hero) | 8:5 | `aspect-[8/5]` | 1344×840-class landscape WebP |
-| Portrait covers | 3:4 | `aspect-[3/4]` | 864×1152 `*-portrait.webp` |
+| Landscape covers (grids) | 8:5 | `aspect-[8/5]` | 1344×840-class landscape WebP |
+| Portrait covers | 4:5 | `aspect-[4/5]` | 864×1152 `*-portrait.webp` (≈6% render crop — source-measured 0.80) |
+| Case-study hero (every case) | 7:3 | `aspect-[7/3]` | the project cover, object-cropped (uniform wide banner — pass-2 parity) |
 | Case detail — wide banner | 7:3 | `aspect-[7/3]` | landscape sources (mild crop) |
 | Case detail — landscape | 3:2 | `aspect-[3/2]` | landscape sources |
-| Case detail — portrait | 3:4 | `aspect-[3/4]` | `detail-*-portrait.webp` |
-| Marquee — tall / wide / landscape | — | `h-59 w-44` / `h-45 w-72` / `h-37 w-64` | derives from item `shape` |
+| Case detail — portrait | 4:5 | `aspect-[4/5]` | `detail-*-portrait.webp` |
+| Marquee — tall / wide / landscape | 4:5 / 5:4 / 4:3 | `h-55 w-44` / `h-58 w-72` / `h-48 w-64` | derives from item `shape` |
 | Marquee — tiles | 1:1 | `h-44 w-44` | — |
-| Hero portrait / collage workspace | 4:5 / 7:4 | `aspect-[4/5]` / `aspect-[7/4]` | `portrait-main.webp` (0.57 — intentional crop) / `workspace.webp` |
+| Hero portrait / collage workspace | 4:5 / 7:4 | `aspect-[4/5]` / `aspect-[7/4]` | `portrait-main.webp` / `workspace.webp` |
 
 - **Page rhythm:** every section is wrapped in `Container`
   (`mx-auto w-full max-w-[1400px] px-6 md:px-10 lg:px-16`). Section
@@ -421,11 +431,11 @@ grep -rn "from \"@/components" src/lib src/data           # must output nothing
 | `Reveal` | `reveal.tsx` | **Client** | IntersectionObserver scroll-reveal wrapper (§6.2, §15.2). |
 | `Marquee` | `marquee.tsx` | Server | 24-item looped strip: project covers + studio details + typographic tiles; renders the sequence twice; duplicate half `aria-hidden`. |
 | `CollageStrip` | `collage-strip.tsx` | Server | Three staggered collage elements (workspace photo, typographic poster, seeded char block) on the home page. |
-| `ProjectCard` | `project-card.tsx` | Server | Image-led card; whole card is the `<Link>`; optional 0-padded index. |
-| `Estimator` | `estimator.tsx` | **Client** | 4-step investment wizard; `role="radiogroup"` options; running total in `aria-live` region. |
+| `ProjectCard` | `project-card.tsx` | Server | Image-led card; whole card is the `<Link>`; minimal editorial meta (title, uppercase practice line, year — pass-2 parity). |
+| `Estimator` | `estimator.tsx` | **Client** | Static four-group form (1 Project type / 2 Business stage / 3 Timeline / 4 Deliverables) in a 2×2 grid; all options visible; estimate gated until complete; `aria-live` region; `?service=` preselects one group (ADR-010). |
 | `ContactForm` | `contact-form.tsx` | **Client** | zod-validated form, honeypot, four status states (idle/submitting/success/error). |
 | `SiteFooter` | `site-footer.tsx` | Server | Name block, nav column, social column, legal row. |
-| `CtaBand` | `cta-band.tsx` | Server | The shared closing-CTA section: light `bg-muted` band, ink serif headline, `PillLink` action. Used on home, services, and about. |
+| `CtaBand` | `cta-band.tsx` | Server | The shared closing-CTA section: light `bg-muted` band, ink serif headline, `PillLink` action. Used on home, /work, services, and about. |
 
 Client/server split rationale: interactivity *requires* the client bundle;
 everything else stays server-rendered so the static HTML is complete. When
@@ -533,7 +543,7 @@ data files; designers change components; neither touches the other's files.
 
 | File | Lines | Contents |
 |---|---|---|
-| `src/data/site.ts` | ~440 | `SITE` persona block (name, role, location, availability, email, description, URL, `contentUpdatedAt`); `NAV_LINKS` (4); `SOCIAL_LINKS` (3); `SERVICES` (6, with `estimatorId` links); `APPROACH_PRINCIPLES` (3); `AWARDS` (5); `BEYOND_WORK` (3); `PROCESS_STEPS` (4, services page); `FAQ_ITEMS` (6, services page); estimator config: `ESTIMATOR_SERVICES` (4), `COMPANY_STAGES` (4), `TIMELINES` (4), `SCOPES` (3). |
+| `src/data/site.ts` | ~470 | `SITE` persona block (name, role, location, availability, email, description, URL, `contentUpdatedAt`); `NAV_LINKS` (4); `SOCIAL_LINKS` (3); `SERVICES` (6, with `estimatorId` links); `APPROACH_PRINCIPLES` (3); `AWARDS` (5); `BEYOND_WORK` (3); `PROCESS_STEPS` (5, services page — Discover/Strategy/Design/Refinement/Delivery); `FAQ_ITEMS` (6, services page); estimator config: `ESTIMATOR_SERVICES` (4), `COMPANY_STAGES` (4), `TIMELINES` (4, labels carry week ranges), `SCOPES` (3, "Core Essentials"). |
 | `src/data/projects.ts` | ~430 | `PROJECTS` (8 case studies with `coverAspect` + `details[].aspect`; `featured: true` on 4), `FEATURED_PROJECTS` (derived filter), `getProject()`, `getNextProject()` (circular), `getMarqueeItems()` (24-item assembly with `shape` fields: 8 covers + 5 studio details + 11 typographic tiles). |
 
 Both files have co-located contract tests (`src/data/*.test.ts`) that pin
@@ -556,10 +566,11 @@ the invariants below — content edits that break a contract fail the suite.
 1. Choose the aspect — `PROJECTS` must keep alternating `landscape, portrait`
    in list order (tested); with 8 projects, a 9th takes `landscape`, a 10th
    `portrait`.
-2. Drop the images: a cover at 3:4 (`<slug>-portrait.webp`, 864×1152) for
+2. Drop the images: a cover at 4:5-croppable (`<slug>-portrait.webp`, 864×1152 renders at `aspect-[4/5]` with a ≈6% crop) for
    portrait slots or a landscape cover, plus detail images (wide/landscape
-   from the shared pool, or a new 3:4 portrait detail — `-portrait` naming
-   is tested for featured portrait details).
+   from the shared pool, or a 4:5 portrait detail — `-portrait` naming
+   is tested for featured portrait details). The cover doubles as the
+   case hero, object-cropped to the uniform 7:3 banner.
 3. `src/data/projects.ts` — append the `Project` object with `coverAspect`,
    two `details` (first = `wide`; second = `portrait` if featured, else
    `landscape`), and `featured: true` only for the home grid (keep exactly 4).
@@ -814,9 +825,10 @@ repo's history (B-1, B-2, L7).
 
 ```bash
 bun run lint        # 1. eslint . — zero warnings tolerated
-bun run typecheck   # 2. tsc --noEmit — strict
+bun run typecheck   # 2. tsc --noEmit — strict (includes e2e/ specs)
 bun run test        # 3. vitest run — 44/44 (count grows with new tests)
 bun run build       # 4. next build — expect "20 routes" / 0 errors
+bun run e2e:all     # 5. playwright — 81/81 against the fresh production build
 ```
 
 **5. Structural invariants** (copy-paste):
@@ -840,6 +852,8 @@ bash /home/z/my-project/scripts/smoke_test.sh   # starts :3001, checks health,
 Expect: health `ok:true`; valid contact → `202` + `{"ok":true…}`; invalid →
 `400` + field errors; every page route `200`; CSP/X-Frame/Referrer/HSTS
 headers present; screenshots non-blank **after the script's scroll step**.
+(The e2e suite in step 5 now covers most of this mechanically; the script
+remains the human-friendly sweep.)
 
 **7. Content sanity:** `SITE.url` matches the deployment origin; featured
 count = 4; every `estimatorId` non-null value exists in `ESTIMATOR_SERVICES`.
@@ -930,6 +944,18 @@ images; instead `coverAspect`/`aspect`/`shape` became typed data fields with
 invariant tests (alternation, file existence, naming), and components merely
 map them to classes. When layout must reflect *which image* is shown, the
 data layer is the only honest owner.
+
+**L13. Parity is measured, never assumed — probe rendered geometry, not DOM
+order.** The original build assumed the source's estimator was a four-step
+wizard (an inference from the JS bundle) and read the home featured grid
+from DOM order; both were wrong. The pass-2 audit probed *rendered bounding
+boxes* on the live source (button positions and y-coordinates revealed a
+static all-groups form; grid placement revealed L,P/L,P) and every fix then
+mapped to a number. When replicating a design, extract geometry
+(`getBoundingClientRect`, computed styles, intrinsic vs rendered ratios)
+from the running page — screenshots and VLM verdicts are useful triage, but
+numbers are the contract. And after fixing, re-probe: the shipped fix is
+only real when the measurement matches.
 
 ---
 
@@ -1413,7 +1439,7 @@ type ContactPageProps = { searchParams: Promise<{ service?: string }> };
 
 ## Appendix A: Architecture Decision Records
 
-Eight ADRs govern this codebase (full narratives in
+Ten ADRs govern this codebase (full narratives in
 `Project_Architecture_Document.md` §1; the SKILL-level summary):
 
 | ADR | Decision | One-line rationale | What it forbids |
@@ -1426,6 +1452,8 @@ Eight ADRs govern this codebase (full narratives in
 | ADR-006 | `images.unoptimized: true` + `next/image`, assets pre-encoded as WebP | Portability (any Node host) over optimization; layout discipline retained; format win without an optimizer | Forgetting width/height; assuming an optimizer exists |
 | ADR-007 | Fail-open no-JS reveal guards | Content must never be trapped invisible without scripting; `html:not(.js)` + `scripting: none` CSS guards | JS-only visibility gating; `noscript` style hacks |
 | ADR-008 | Mixed-aspect editorial rhythm as data | Image orientation is a content decision — typed, tested fields drive render classes | CSS `nth-child` aspect tricks; uniform thumbnail grids |
+| ADR-009 | Playwright e2e layer on the production artifact | Parity/a11y/API contracts only count if a machine re-checks them; validate the built app, not dev HMR | Manual-only verification; parallel workers racing rate-limit state |
+| ADR-010 | Pass-2 parity redesign (static estimator + measured geometry) | Every layout fix maps to a measured source-site fact; design-language parity is fixed, content richness is kept | Re-imagining source interactions (the wizard assumption); trusting DOM order over rendered geometry |
 
 ## Appendix B: Audit History
 
@@ -1435,6 +1463,9 @@ Eight ADRs govern this codebase (full narratives in
 | Visual parity audit vs reference site | 2026-09-13 | agent-browser walkthrough of both sites; DOM/computed-style extraction on both; 12 full-page screenshots + VLM pairwise review | HIGH design-language parity; 10 gaps cataloged (V-1 CTA band, V-2 aspect rhythm, V-3 marquee shapes, V-4 detail aspects, V-5 skip link, V-6 services sections + 4 minor) — see `docs/AUDIT_VISUAL_PARITY.md` |
 | Code review & audit (Six-Axis) | 2026-09-13 | full source read + mechanical greps + live probes (CWV, API, estimator, form) | 0 Critical; 18 findings (C-1 no-JS reveal High, aesthetic-parity Highs, consistency/a11y Mediums) — see `docs/AUDIT_CODE_REVIEW.md` |
 | Remediation pass 1 (TDD) | 2026-09-13 | 26 RED tests first → 8 portrait images generated → data + markup fixes → probes + VLM re-review → WebP pass | All 10 gap groups closed; 44/44 tests; grids alternate 1.60/0.75; estimator behavior identical; CWV no regression (FCP 144 ms, CLS 0, LCP 700 ms); WebP gain measured at 9% (L10) — see `docs/REMEDIATION_PLAN.md` §6 |
+| Playwright e2e suite | 2026-09-13 | `playwright.config.ts` adapted from the home-financing reference + 7 spec files (80 specs at introduction) | All green on the production build; every parity fix from pass 1 gained a named regression guard (ADR-009) |
+| Pass-2 verification audit | 2026-09-13 | agent-browser re-probe of both sites (rendered geometry), 10 fresh screenshots, VLM pairwise re-review | Pass-1 fixes all hold; 14 new measured findings (F-1 /work CTA band, F-2 estimator interaction model, F-3/F-14 contact layout, F-4/F-5 aspect/hero geometry, F-6..F-9 hero/grid compositions, F-10 card grammar, F-11 marquee mix, F-12/F-13 label/referral parity) — see `docs/AUDIT_VISUAL_PARITY.md` § Pass 2 |
+| Remediation pass 2 (TDD) | 2026-09-13 | estimator spec rewritten RED first → static four-group estimator + gated estimate → layout geometry fixes → /work CTA → 5-step process → card grammar + marquee shapes | 12/12 in-scope findings closed; 44 unit + 81 e2e green; re-probes match source measurements exactly (1.6/0.8 rhythm, 2.33 hero, form x=64 / info x=859, 3-col grids at x=64/461/859) — see `docs/REMEDIATION_PLAN.md` § Pass 2 |
 
 ## Appendix C: Post-Deploy Live-Site Validation
 

@@ -10,150 +10,154 @@ import {
   TIMELINES,
   type EstimatorServiceId,
 } from "@/data/site";
-import { estimateRange, formatCompactUsd, formatRange, type EstimatorSelection } from "@/lib/estimator";
+import { estimateRange, formatRange } from "@/lib/estimator";
 
-type StepKey = keyof EstimatorSelection;
+/**
+ * Investment estimator — a static four-group form.
+ *
+ * Pass-2 parity redesign: the source renders every group simultaneously
+ * (1 Project type / 2 Business stage / 3 Timeline / 4 Deliverables) and
+ * gates the estimate until each group has a selection, rather than walking
+ * the visitor through a step machine. Selecting an option in any group is
+ * recorded immediately; the estimate appears only once the selection is
+ * complete, and stays honest as earlier choices are revised.
+ */
 
-type EstimatorOption = { id: string; label: string; baseLow?: number; baseHigh?: number };
+/** Partial selection — a group is unchosen until the visitor picks. */
+type StaticSelection = {
+  serviceId: EstimatorServiceId | null;
+  stageId: string | null;
+  timelineId: string | null;
+  scopeId: string | null;
+};
 
-const STEPS: ReadonlyArray<{
-  key: StepKey;
-  label: string;
-  question: string;
-}> = [
-  { key: "serviceId", label: "Service", question: "What does the project need?" },
-  { key: "stageId", label: "Company", question: "Where is the company today?" },
-  { key: "timelineId", label: "Timeline", question: "How should the work be paced?" },
-  { key: "scopeId", label: "Scope", question: "How far should the system go?" },
+type GroupKey = keyof StaticSelection;
+
+/** The four numbered groups, in the source's order and wording. */
+const GROUPS: ReadonlyArray<{ n: string; key: GroupKey; label: string }> = [
+  { n: "1", key: "serviceId", label: "Project type" },
+  { n: "2", key: "stageId", label: "Business stage" },
+  { n: "3", key: "timelineId", label: "Timeline" },
+  { n: "4", key: "scopeId", label: "Deliverables" },
 ];
 
-/** Options for every step, keyed by step — one render path, no copy-paste drift. */
-const OPTION_SETS: Record<StepKey, ReadonlyArray<EstimatorOption>> = {
+type EstimatorOption = { id: string; label: string };
+
+/** Options for every group, keyed by group — one render path, no copy-paste drift. */
+const OPTION_SETS: Record<GroupKey, ReadonlyArray<EstimatorOption>> = {
   serviceId: ESTIMATOR_SERVICES,
   stageId: COMPANY_STAGES,
   timelineId: TIMELINES,
   scopeId: SCOPES,
 };
 
-/**
- * Four-step investment estimator. Selecting an option records the choice and
- * advances; the running estimate is always derived from the full selection,
- * so it stays honest as the visitor refines earlier steps.
- */
 export function Estimator({ initialServiceId }: { initialServiceId?: EstimatorServiceId }) {
-  const [step, setStep] = useState(0);
-  const [selection, setSelection] = useState<EstimatorSelection>({
-    serviceId: initialServiceId ?? "brand-identity",
-    stageId: "growing",
-    timelineId: "standard",
-    scopeId: "comprehensive",
+  const [selection, setSelection] = useState<StaticSelection>({
+    serviceId: initialServiceId ?? null,
+    stageId: null,
+    timelineId: null,
+    scopeId: null,
   });
 
-  const range = useMemo(() => estimateRange(selection), [selection]);
+  const complete =
+    selection.serviceId !== null &&
+    selection.stageId !== null &&
+    selection.timelineId !== null &&
+    selection.scopeId !== null;
 
-  function choose(key: StepKey, id: string) {
-    setSelection((prev) => ({ ...prev, [key]: id }) as EstimatorSelection);
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  const range = useMemo(
+    () =>
+      complete
+        ? estimateRange({
+            serviceId: selection.serviceId as EstimatorServiceId,
+            stageId: selection.stageId as string,
+            timelineId: selection.timelineId as string,
+            scopeId: selection.scopeId as string,
+          })
+        : null,
+    [complete, selection],
+  );
+
+  function choose(key: GroupKey, id: string) {
+    setSelection((prev) => ({ ...prev, [key]: id }));
   }
 
-  const active = STEPS[step]!;
-  const done = step === STEPS.length - 1;
-  const options = OPTION_SETS[active.key];
-  const showPrice = active.key === "serviceId";
-
   return (
-    <div className="border border-border">
-      {/* Step header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-5 md:px-8">
+    <div>
+      {/* Header — open text, no boxed card (the source's estimator floats
+          directly on the page background). */}
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
         <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
           Investment estimator
         </p>
-        <ol className="flex items-center gap-2" aria-label="Estimator steps">
-          {STEPS.map((s, i) => {
-            const state = i === step ? "active" : i < step ? "done" : "todo";
-            return (
-              <li key={s.key}>
-                <button
-                  type="button"
-                  onClick={() => setStep(i)}
-                  aria-current={i === step ? "step" : undefined}
-                  className={`flex h-7 w-7 items-center justify-center rounded-full border text-[11px] tabular-nums transition-colors ${
-                    state === "active"
-                      ? "border-foreground bg-foreground text-background"
-                      : state === "done"
-                        ? "border-foreground text-foreground"
-                        : "border-border text-muted-foreground"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+        <p className="text-xs text-muted-foreground">Get a personalized estimate.</p>
       </div>
 
-      {/* Step body */}
-      <div className="px-6 py-8 md:px-8">
-        <p className="font-serif text-3xl tracking-tight md:text-4xl">{active.question}</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Step {step + 1} of {STEPS.length} — {active.label}
-        </p>
+      <p className="mt-5 text-sm text-muted-foreground">
+        Answer a few questions to receive a tailored investment range — final numbers are set
+        together after a scoping call.
+      </p>
 
-        <div className="mt-8 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={active.question}>
-          {options.map((option) => {
-            const selected = selection[active.key] === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => choose(active.key, option.id)}
-                className={`flex text-left transition-colors duration-200 ${
-                  showPrice ? "items-baseline justify-between gap-4" : ""
-                } border px-5 py-4 ${
-                  selected
-                    ? "border-foreground bg-muted"
-                    : "border-border hover:border-foreground/40"
-                }`}
-              >
-                <span className="text-sm font-medium">{option.label}</span>
-                {typeof option.baseLow === "number" && typeof option.baseHigh === "number" ? (
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {formatCompactUsd(option.baseLow)}–{formatCompactUsd(option.baseHigh)}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
-        {step > 0 ? (
-          <button
-            type="button"
-            onClick={() => setStep((s) => Math.max(s - 1, 0))}
-            className="link-underline mt-6 text-xs uppercase tracking-[0.18em] text-muted-foreground"
-          >
-            Back
-          </button>
-        ) : null}
+      {/* Groups — all four visible at once, numbered like the source, in a
+          2×2 column grid: Project type | Business stage / Timeline | Deliverables. */}
+      <div className="mt-10 grid gap-x-10 gap-y-10 md:grid-cols-2">
+        {GROUPS.map((group) => (
+          <div key={group.key}>
+            <p className="flex items-baseline gap-3">
+              <span className="text-xs tabular-nums text-muted-foreground">{group.n}</span>
+              <span className="text-xs font-medium uppercase tracking-[0.22em]">
+                {group.label}
+              </span>
+            </p>
+            <div
+              className="mt-4 grid gap-3 sm:grid-cols-2"
+              role="radiogroup"
+              aria-label={group.label}
+            >
+              {OPTION_SETS[group.key].map((option) => {
+                const selected = selection[group.key] === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => choose(group.key, option.id)}
+                    className={`border px-5 py-4 text-left text-sm font-medium transition-colors duration-200 ${
+                      selected
+                        ? "border-foreground bg-muted"
+                        : "border-border hover:border-foreground/40"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Running estimate */}
+      {/* Estimate — gated until every group has a selection. */}
       <div
-        className="flex flex-wrap items-center justify-between gap-4 border-t border-border bg-muted px-6 py-6 md:px-8"
+        className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8"
         aria-live="polite"
       >
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-            Estimated starting range
+            Your estimate
           </p>
-          <p className="mt-1 font-serif text-3xl tracking-tight md:text-4xl tabular-nums">
-            {formatRange(range)}
-          </p>
+          {complete && range ? (
+            <p className="mt-1 font-serif text-3xl tracking-tight tabular-nums md:text-4xl">
+              {formatRange(range)}
+            </p>
+          ) : (
+            <p className="mt-1 max-w-[42ch] text-sm leading-relaxed text-muted-foreground">
+              Complete all selections to see your personalized estimate.
+            </p>
+          )}
         </div>
-        {done ? (
+        {complete ? (
           <Link
             href="#contact-form"
             className="inline-flex items-center gap-2 rounded-full bg-foreground px-6 py-3 text-xs font-medium uppercase tracking-[0.14em] text-background transition-opacity duration-300 hover:opacity-80"
@@ -162,7 +166,8 @@ export function Estimator({ initialServiceId }: { initialServiceId?: EstimatorSe
           </Link>
         ) : (
           <p className="max-w-[28ch] text-xs leading-relaxed text-muted-foreground">
-            Ranges adjust with your choices — final investment is set together after a scoping call.
+            Ranges adjust with your choices — final investment is set together after a scoping
+            call.
           </p>
         )}
       </div>

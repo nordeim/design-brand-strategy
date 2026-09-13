@@ -3,8 +3,17 @@ import { describe, expect, it } from "vitest";
 import { FAQ_ITEMS, PROCESS_STEPS, SITE } from "@/data/site";
 
 describe("PROCESS_STEPS (services page process section)", () => {
-  it("documents four numbered steps", () => {
-    expect(PROCESS_STEPS).toHaveLength(4);
+  it("documents five numbered steps with the source-parity titles", () => {
+    // Pass-2 parity: the source renders five process steps
+    // (Discovery → Strategy → Design → Refinement → Delivery).
+    expect(PROCESS_STEPS).toHaveLength(5);
+    expect(PROCESS_STEPS.map((s) => s.title)).toEqual([
+      "Discover",
+      "Strategy",
+      "Design",
+      "Refinement",
+      "Delivery",
+    ]);
     PROCESS_STEPS.forEach((step, i) => {
       expect(step.number).toBe(String(i + 1).padStart(2, "0"));
       expect(step.title.trim().length).toBeGreaterThan(0);

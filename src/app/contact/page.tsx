@@ -9,7 +9,7 @@ import { ESTIMATOR_SERVICES, SITE, type EstimatorServiceId } from "@/data/site";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Start a project with Elena Vance — estimate your investment in four steps, then tell me about the work.",
+    "Start a project with Elena Vance — estimate your investment, then tell me about the work.",
   openGraph: {
     images: [
       {
@@ -56,10 +56,17 @@ export default async function ContactPage({ searchParams }: PageProps) {
         </Reveal>
       </Container>
 
-      {/* Inquiry form + practical details */}
+      {/* Inquiry form + practical details — form left, studio info right
+          (source geometry: form x=160, mailto x=843). */}
       <Container className="border-t border-border py-16 md:py-24">
         <div className="grid gap-12 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-4">
+          <div className="md:col-span-7" id="contact-form">
+            <Reveal>
+              <ContactForm />
+            </Reveal>
+          </div>
+
+          <div className="md:col-span-4 md:col-start-9">
             <div className="md:sticky md:top-28">
               <Reveal>
                 <SectionLabel>The studio</SectionLabel>
@@ -88,12 +95,6 @@ export default async function ContactPage({ searchParams }: PageProps) {
                 </ol>
               </Reveal>
             </div>
-          </div>
-
-          <div className="md:col-span-7 md:col-start-6" id="contact-form">
-            <Reveal>
-              <ContactForm />
-            </Reveal>
           </div>
         </div>
       </Container>

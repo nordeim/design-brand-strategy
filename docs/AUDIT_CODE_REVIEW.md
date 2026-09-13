@@ -102,3 +102,33 @@ The material findings are (a) one robustness defect with accessibility impact (n
 | **P2** | R-1 (K-4), AA-3 (K-8), P-1/P-2/P-3, C-3, AA-4, R-2, S-3 | estimator DRY · per-page OG · image weight/crops · sitemap lastmod · focus management · labels colocated · dep audit |
 
 **Test coverage note (TDD readiness):** pure logic is well covered (estimator 9, contact 9). The remediation introduces new logic surfaces — mixed-aspect data fields, marquee aspect invariants, services FAQ/process data, OG-image mapping — each of which gets a failing test first (RED) before implementation (GREEN), per `test-driven-development`. Visual outcomes are verified with the agent-browser probe scripts (scroll discipline applied).
+
+---
+
+# Pass 2 — Delta Review (2026-09-13, second session)
+
+**Scope:** the Playwright e2e additions (`playwright.config.ts`, 7 spec files, package.json/gitignore/env changes) and the pass-2 remediation changes (estimator rebuild, layout geometry, card grammar, referral select, process expansion). Method: code-quality-standards Six-Axis on each change, tests reviewed first.
+
+## E2E additions — verdict: **Approve** (nits recorded)
+
+| Axis | Assessment |
+|---|---|
+| Correctness | 81/81 specs green against the production build; API specs use per-test spoofed `x-forwarded-for` so shared rate-limit state never cross-contaminates; the burst test pins `[202,202,202,202,202,429]` exactly. No-JS specs correctly work around the Playwright limitation (locator engine cannot inject scripts when `javaScriptEnabled: false`) via `page.evaluate` — documented in the spec header. |
+| Readability | Spec headers record provenance (adapted-from reference) and adaptation rationale; every non-obvious assertion carries a why-comment (route announcer scoping, honeypot bounding-box, sr-only 1px box). |
+| Architecture | Data-driven specs import `src/data/*` — no duplicated slug/title/image inventories; config mirrors the proven reference structure; serial workers justified by shared server state. |
+| Security | The security-header contract (CSP/XFO/HSTS/nosniff/Referrer/Permissions) is now machine-enforced — a security regression gate that did not exist before. No secrets in test code. |
+| Performance | ~38s for 81 specs on one serial worker; acceptable. *(Consider: parallelizing the page-only specs later if the suite grows.)* |
+| Aesthetic/UX rigor | The suite *enforces* the rigor axis: axe critical gates, skip-link keyboard reveal, focus-ring visibility, reduced-motion contract, aria states on the estimator/form. |
+
+Nits (non-blocking): `.first()` used for the availability-pill assertion (would mask duplicates — acceptable given the pill is unique in the hero); the mobile spec duplicates the hero-aspect assertion that also exists in parity (cheap, keeps the mobile file self-contained).
+
+## Pass-2 remediation changes — verdict: **Approve**
+
+- **Correctness:** every change maps to a measured source fact (see AUDIT_VISUAL_PARITY § P2.3/P2.6); estimator math untouched (44/44 unit tests unchanged except the deliberate 5-step data-contract update); `estimateRange` fail-fast contract preserved by gating before the call.
+- **Readability:** estimator's `GROUPS`/`OPTION_SETS` keep one render path; component comments explain the parity rationale with the source measurements.
+- **Architecture:** content-as-code respected (new step, labels, referral options all live in the data/lib layers with colocated labels — R-2 rule held); no new client components (still exactly 5); no new dependencies beyond the test layer.
+- **Security:** referral select emits fixed values — the zod schema (`string ≤200 optional`) still validates at the boundary; honeypot untouched and now machine-verified.
+- **Performance:** no added client JS beyond the estimator's state (slightly less than the wizard: no step machine); portrait 4:5 renders crop ~6% of 3:4 sources — negligible decode cost, identical to the source's own crop strategy.
+- **Aesthetic/UX rigor:** the redesign *removes* a divergence (boxed estimator) the VLM flagged and preserves the source's editorial grammar (numbered groups, uppercase practice lines, minimal cards). The Anti-Generic litmus passes: every visual decision traces to a measured source pattern, not a template default.
+
+**Deferred (documented):** WebKit e2e project; awards-row arrangement; CI pipeline for the suite.

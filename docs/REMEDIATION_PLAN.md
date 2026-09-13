@@ -162,3 +162,80 @@ Each planned change was mapped to its actual target (file + current code) during
 
 Pushed via the paramiko SSH wrapper to `git@github.com:nordeim/design-brand-strategy.git`;
 remote `origin/main` verified equal to local (`c3f10fb`), working tree clean.
+
+---
+
+# Pass 2 — Remediation Plan (2026-09-13, second session)
+
+**Inputs:** `docs/AUDIT_VISUAL_PARITY.md` § Pass 2 (F-1…F-14, all mechanically measured on both sites) + Playwright e2e suite (80 specs) now available as the RED/GREEN harness.
+**Method:** TDD per `test-driven-development` — update/write the failing e2e expectation first (RED), apply the minimal markup/data change (GREEN), re-run the full suite. Per `planning-and-task-breakdown`, each phase is independently verifiable and sized to one logical change.
+**Branch policy:** main only (operator contract).
+
+## P2 scope decisions
+
+**In scope (12 fixes):**
+
+| # | Finding | Fix |
+|---|---|---|
+| P2-1 | F-1 `/work` missing closing CTA | Add `CtaBand` (light band) to `/work` with original copy |
+| P2-2 | F-2/F-12 estimator interaction model | Rebuild `Estimator` as a static four-group form: groups 1 Project type / 2 Business stage / 3 Timeline / 4 Deliverables, all options visible, estimate gated until all four are chosen ("Complete all selections to see your personalized estimate."), option prices dropped (source shows bare labels) |
+| P2-3 | F-13 label parity | Timeline labels gain durations ("Flexible (12+ weeks)" … "Rush (under 6 weeks)"), scope "Core" → "Core Essentials"; referral field becomes a select (Referral / Social Media / Search Engine / Press / Publication / Other) — options colocated in `lib/contact.ts` |
+| P2-4 | F-3 contact field layout | Single-column stacked fields (drop the two 2-col grids) |
+| P2-5 | F-14 contact column inversion | Form left (col-span-7), studio info right (col-span-4/start-9) — source measured form x=160, mailto x=843 |
+| P2-6 | F-4 portrait ratio | `aspect-[4/5]` (0.80, source-measured) for portrait covers, home about-teaser portrait, about-hero portrait, case detail portraits |
+| P2-7 | F-5 case hero | Uniform `aspect-[7/3]` wide banner from the cover (source object-crops its 1280×800 covers the same way) |
+| P2-8 | F-6/F-6b about hero + approach | Hero becomes split: label/h1/bio left col-7, portrait right col-5; approach principles render as a 3-column grid |
+| P2-9 | F-7 home teaser inversion | Text left (col-7) + portrait right (col-5) — matches source (portrait x=771) |
+| P2-10 | F-8 home services | 3-column horizontal cards (name + one-liner) instead of vertical rows |
+| P2-11 | F-9 services process | 5 horizontal steps (add an original "Refinement" step), grid-cols-5 on md+ |
+| P2-12 | F-10/F-11 card grammar + marquee shapes | ProjectCard meta → uppercase services · year (drop index/summary/tags from cards — summaries remain on case pages); marquee shapes → tall 4:5 (w-44 h-55), wide 5:4 (w-72 h-58), landscape 4:3 (w-64 h-48) |
+
+**Deferred with rationale (documented, not fixed):**
+- Awards-row column arrangement (source stacks org+title in a middle column) — measured but low-impact compositional nuance; recorded in the audit.
+- 6 services vs source 4, richer service rows, case-study prose depth — original content richness (pass-1 framework).
+- Contact success/429 copy, dark mode, collage strip, availability pill — pass-1 acceptances re-affirmed.
+- WebKit e2e project — no cached browser binary in this sandbox; chromium + Pixel-7 emulation cover the shipped surface.
+
+## P2 validation against the codebase (pre-execution)
+
+Checked before writing any code:
+1. `CtaBand` props (`label/title/body/href/linkText`) support the `/work` band without modification — verified in `src/components/cta-band.tsx`.
+2. `Estimator` already renders from `OPTION_SETS` (K-4 refactor) — the static redesign reuses it directly; `estimateRange` requires a complete selection (fail-fast on unknown ids), so the gate is `serviceId && stageId && timelineId && scopeId`.
+3. `TIMELINES`/`SCOPES` live in `src/data/site.ts` — label changes are data-only; ids unchanged so `estimator.test.ts` (pure math) stays valid.
+4. `contactSchema.referral` is `string ≤200 optional` — a select emits values, so no schema change; `contact.test.ts` stays valid.
+5. Portrait sources are 864×1152 (3:4) — rendering at 4:5 crops ≈6% with `object-cover` (source does the same to its 1280×800 set); case-hero 7:3 crops landscape covers ≈31% vertically and portrait covers harder, identical to source behavior (measured intrinsic 1280×800 → rendered 2.33).
+6. Filename collision check: no new files except none — all changes are edits to existing files; e2e spec updates touch `estimator.spec.ts` (rewrite), `contact.spec.ts` (referral select), `parity.spec.ts` (ratio + marquee + card grammar assertions), `smoke.spec.ts` (card grammar).
+7. `/work` CtaBand placement: after the project grid `Container`, before the implicit footer — mirrors home/services/about usage.
+
+## P2 execution order (TDD)
+
+RED → GREEN per step, full suite after each:
+1. P2-2/P2-3 (estimator + labels + referral select) — largest change, rewrite `estimator.spec.ts` first
+2. P2-4/P2-5 (contact layout)
+3. P2-6/P2-7 (portrait ratio + case hero) — update `parity.spec.ts` expectations
+4. P2-8/P2-9 (about hero/approach + home teaser)
+5. P2-10/P2-11 (home services + process)
+6. P2-12 (card grammar + marquee shapes)
+7. P2-1 (/work CTA) + full-suite verification + visual re-probe of both sites
+
+---
+
+# Pass 2 — Execution Record (2026-09-13)
+
+Executed per the TDD order above; every step followed RED → GREEN with the e2e suite as the harness.
+
+| Step | RED evidence | GREEN change | Verification |
+|---|---|---|---|
+| P2-2/P2-3 estimator + labels + referral | `estimator.spec.ts` rewritten for the static model — 6 failures against the wizard | `estimator.tsx` rebuilt as static four-group form (2×2 group grid, gated estimate, `OPTION_SETS` reused); `TIMELINES` labels gain durations; `SCOPES` "Core" → "Core Essentials"; `REFERRAL_OPTIONS`/`REFERRAL_LABELS` added to `lib/contact.ts`; form referral → select | 7/7 estimator specs green; live probe: 4 groups × 15 radios, "Complete all selections…" gate |
+| P2-4/P2-5 contact layout | (covered by label-wiring + visual probes) | form fields single-column; form left (col-7) / studio info right (col-4/start-9) | live probe: form x=64, mailto x=859 (source: 160/843 — same sides); contact specs green |
+| P2-6/P2-7 portrait + case hero | `parity.spec.ts` expectations updated to 4:5 + new 7:3 hero spec (failed against 3:4 / per-project hero) | `project-card.tsx` portrait → `aspect-[4/5]`; `work/[slug]` hero → uniform `aspect-[7/3]`, detail portrait → `aspect-[4/5]`; home about-teaser portrait → 4:5 | live probe: /work rhythm `[1.6,0.8,…]`, case hero 2.33 |
+| P2-8/P2-9 about hero/approach + home teaser | (visual probes; no spec change needed) | about hero → split (label/h1/bio col-7, portrait col-5); approach → 3-column grid; home teaser → text left / portrait right | live probe: h1 x=64 / portrait x=759; approach titles x=64/461/859 same row |
+| P2-10/P2-11 home services + process | (visual probes; `site.test.ts` updated to the new 5-step contract — failed at 4) | home services → 3-column cards; `PROCESS_STEPS` → 5 steps (original "Refinement" copy), services process → `lg:grid-cols-5` horizontal | live probe: service cards x=64/461/859; process steps x=64→1018 same row; unit test green |
+| P2-12 card grammar + marquee shapes | new "minimal editorial meta grammar" spec (failed against index/summary cards) | `ProjectCard` → title + uppercase practice line · year; `index` prop removed; marquee shapes → tall 4:5 / wide 5:4 / landscape 4:3 | parity spec green; marquee distinct heights ≥ 3 |
+| P2-1 /work CTA | (visual probe — band absent) | `CtaBand` added to `/work` ("Have something in mind? / Let's discuss your project.") | live probe: band rendered; curl HTML contains the copy |
+
+**VLM refinement round:** the post-fix VLM comparison flagged the estimator's bordered card container (source floats options on the page background in a 2-column group arrangement) and the card meta split. Both fixed: estimator de-boxed into an open band with a 2×2 group grid; card meta moved to a single line (uppercase services left, year right).
+
+**Final gates (all green):** eslint clean · `tsc --noEmit` clean · vitest 44/44 · `next build` 20 routes · Playwright **81/81** (chromium + Pixel-7 mobile) · live re-probes match source measurements exactly.
+
+**Deferred (re-affirmed):** awards-row column arrangement (measured, low-impact), 6-vs-4 services and richer service rows (content richness), dark mode / collage strip / availability pill (pass-1 acceptances), WebKit e2e project (no cached binary).

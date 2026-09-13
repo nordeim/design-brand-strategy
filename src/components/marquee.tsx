@@ -11,11 +11,12 @@ import { getMarqueeItems } from "@/data/projects";
  * renders the sequence twice and shifts by -50% for a seamless loop.
  */
 
-/** Render geometry per shape — width and image height in one place. */
+/** Render geometry per shape — width and image height in one place.
+ *  Ratios track the source's gallery mix: tall 4:5, wide 5:4, landscape 4:3. */
 const SHAPE_CLASS = {
-  tall: "h-59 w-44", // 4:5 portrait covers (176×236)
-  wide: "h-45 w-72", // 8:5 landscape covers (288×180)
-  landscape: "h-37 w-64", // 7:4 studio details (256×148)
+  tall: "h-55 w-44", // 4:5 portrait covers (176×220)
+  wide: "h-58 w-72", // 5:4 landscape covers (288×232)
+  landscape: "h-48 w-64", // 4:3 studio details (256×192)
 } as const;
 
 export function Marquee() {
@@ -40,7 +41,7 @@ export function Marquee() {
                   src={item.src}
                   alt={index >= items.length ? "" : item.alt}
                   width={item.shape === "tall" ? 176 : item.shape === "wide" ? 288 : 256}
-                  height={item.shape === "tall" ? 236 : item.shape === "wide" ? 180 : 148}
+                  height={item.shape === "tall" ? 220 : item.shape === "wide" ? 232 : 192}
                   className={`${SHAPE_CLASS[item.shape]} flex-none object-cover`}
                 />
                 <figcaption className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">

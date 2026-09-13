@@ -6,7 +6,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?logo=typescript&logoColor=white)
 ![License](https://img.shields.io/badge/license-Proprietary-lightgrey)
 
-Editorial portfolio website for **Elena Vance — Designer & Brand Strategist** (New York): a fast, accessible, fully static-first Next.js site with a four-step investment estimator and a validated inquiry form.
+Editorial portfolio website for **Elena Vance — Designer & Brand Strategist** (New York): a fast, accessible, fully static-first Next.js site with a four-group investment estimator (source-parity static form) and a validated inquiry form.
 
 ## Overview
 
@@ -21,13 +21,14 @@ The site is an original implementation: its code, copy, and imagery are all orig
 | ✍️ Editorial design system | Cream/ink token palette, Instrument Serif + Inter, class-based dark mode with no-flash pre-hydration script |
 | 🖼️ 19 original images | AI-generated portraits, studio imagery, and project covers in WebP (no third-party assets) |
 | 📐 8 case studies | SSG project pages with challenge/approach/outcome narrative, sticky meta, and mixed wide/landscape/portrait detail imagery |
-| 🧱 Mixed-aspect editorial rhythm | Covers alternate landscape (8:5) and portrait (3:4) across grids and the marquee gallery strip |
-| 🧮 Investment estimator | 4-step wizard; pure, unit-tested pricing math (service × stage × timeline × scope) |
+| 🧱 Mixed-aspect editorial rhythm | Covers alternate landscape (8:5) and portrait (4:5) across grids and the marquee gallery strip |
+| 🧮 Investment estimator | Static four-group form (project type / stage / timeline / deliverables) with a gated estimate; pure, unit-tested pricing math |
+| 🧪 Playwright e2e suite | 81 specs across chromium + Pixel-7 emulation: smoke, SEO, assets, contact funnel, estimator wiring, parity regression guards, mobile nav |
+| ❓ Process + FAQ | Services page documents the five-step engagement process (Discover → Strategy → Design → Refinement → Delivery) and six common questions (native `<details>`, zero JS) |
 | 📮 Inquiry form | Shared zod schema client + server, honeypot, per-IP rate limiting (5 / 10 min) |
-| ❓ Process + FAQ | Services page documents the four-step engagement process and six common questions (native `<details>`, zero JS) |
 | 🔒 Hardened headers | CSP, HSTS, X-Frame-Options, nosniff, Referrer-/Permissions-Policy emitted by the app |
 | ♿ Accessibility | Skip-to-content link, semantic landmarks, aria states, focus-visible rings, no-JS reveal guard, reduced-motion guards |
-| 🧪 Verified | 44 unit tests, strict TypeScript, clean ESLint, production smoke test |
+| 🧪 Verified | 44 unit tests + 81 Playwright e2e specs, strict TypeScript, clean ESLint, production smoke test |
 
 ## Architecture
 
@@ -77,13 +78,15 @@ No database, no external services. The `/api/contact` handler validates and rate
  ┣ 📂 components/           # 11 components — only 5 are client components
  ┃ ┗ 📄 estimator.tsx contact-form.tsx reveal.tsx marquee.tsx cta-band.tsx collage-strip.tsx …
  ┣ 📂 data/
- ┃ ┣ 📄 site.ts             # Persona, nav, 6 services, estimator config, process, FAQ, awards
+ ┃ ┣ 📄 site.ts             # Persona, nav, 6 services, estimator config, 5-step process, FAQ, awards
  ┃ ┗ 📄 projects.ts         # 8 case studies (mixed aspects) + marquee sequence
  ┗ 📂 lib/
-   ┣ 📄 estimator.ts        # Pure pricing math (+ tests)
-   ┣ 📄 contact.ts          # Shared zod schema + option labels (+ tests)
-   ┣ 📄 char-block.ts       # Deterministic seeded text (hydration-safe)
-   └ 📄 rate-limit.ts       # Bounded in-memory limiter
+ ┣ 📄 estimator.ts        # Pure pricing math (+ tests)
+ ┣ 📄 contact.ts          # Shared zod schema + option labels (+ tests)
+ ┣ 📄 char-block.ts       # Deterministic seeded text (hydration-safe)
+ └ 📄 rate-limit.ts       # Bounded in-memory limiter
+📂 e2e/                    # 7 Playwright specs (smoke, seo, assets, contact,
+                          # estimator, parity, mobile) + playwright.config.ts
 📂 public/images/           # 19 generated WebP originals
 ```
 
@@ -116,6 +119,7 @@ Requires Node.js ≥ 20 and Bun ≥ 1.1.
 ```bash
 bun run test        # → Test Files 6 passed (6), Tests 44 passed (44)
 bun run build       # → ✓ Compiled successfully, 20 routes generated
+bun run e2e         # → 81 passed (chromium + mobile; starts its own `next start` on :3002)
 bun run start & curl -s localhost:3000/api/health
                     # → {"ok":true,"service":"design-brand-strategy",...}
 ```
@@ -132,7 +136,23 @@ bun run start & curl -s localhost:3000/api/health
 bun run test              # full unit suite (estimator math, schema + labels, data
                           # contracts, sitemap determinism, no-JS reveal guards)
 bunx vitest run estimator # single file
+
+bun run e2e               # Playwright: chromium project (75 specs) against the
+                          # PRODUCTION build (`next start` on :3002 — validates
+                          # the shipped artifact, not dev HMR)
+bun run e2e:all           # + mobile project (Pixel 7 emulation, hamburger menu)
+bun run e2e:report        # open the HTML report
 ```
+
+The e2e suite (adapted from the home-financing reference config) covers: critical
+surfaces and the security-header contract, SEO pins (13-URL sitemap, exact titles,
+per-case OG images), the full image inventory, the contact API contract
+(202/400/429 + Retry-After, per-field errors, honeypot swallow) and form funnel,
+estimator wiring (gated estimate, label parity, deep-links), parity regression
+guards (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee
+motion contract, theme persistence), and the mobile navigation overlay.
+Requires a production build first (`bun run build`) and the Playwright Chromium
+binary (`bunx playwright install chromium`).
 
 Production smoke (as executed for the initial release): `bun run build && bun run start`, then
 `POST /api/contact` with a valid payload (expect `202`), an invalid payload (expect `400` + field
@@ -152,7 +172,7 @@ Typography: **Instrument Serif** (400 + italic) for display/headlines; **Inter**
 
 Motion: `marquee` keyframe (56s linear loop, hover-pause), 300ms reveal transitions, `link-underline` background-size animation — all disabled under `prefers-reduced-motion` via CSS. Reveal content stays visible when JavaScript is unavailable (dual fail-open guards: `html:not(.js)` and `@media (scripting: none)`).
 
-Image rhythm: project covers alternate landscape (8:5) and portrait (3:4); case-study details mix wide banners (7:3), landscape (3:2), and portrait (3:4); the marquee renders tall/wide/landscape/square shapes as a mixed gallery.
+Image rhythm: project covers alternate landscape (8:5) and portrait (4:5); every case study opens with a uniform 7:3 wide banner hero and mixes wide (7:3), landscape (3:2), and portrait (4:5) details; the marquee renders tall (4:5), wide (5:4), landscape (4:3), and square tile shapes as a mixed gallery.
 
 ## Contact form — production wiring
 

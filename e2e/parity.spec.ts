@@ -77,17 +77,20 @@ test.describe("no-JS reveal safety (K-1)", () => {
     await page.goto("/contact");
     const state = await page.evaluate(() => ({
       radios: document.querySelectorAll("[role='radio']").length,
-      checkedService: [...document.querySelectorAll("[role='radio']")]
-        .find((el) => el.getAttribute("aria-checked") === "true")
-        ?.textContent?.trim() ?? null,
+      checkedCount: [...document.querySelectorAll("[role='radio']")].filter(
+        (el) => el.getAttribute("aria-checked") === "true",
+      ).length,
+      groups: document.querySelectorAll("[role='radiogroup']").length,
       nameField: document.querySelector("#name") !== null,
       messageField: document.querySelector("#message") !== null,
       hiddenReveals: [...document.querySelectorAll("[data-reveal]")].filter(
         (el) => getComputedStyle(el).opacity === "0",
       ).length,
     }));
-    expect(state.radios).toBe(4);
-    expect(state.checkedService).toContain("Brand Identity");
+    // Static estimator: all four groups (15 options), nothing preselected.
+    expect(state.groups).toBe(4);
+    expect(state.radios).toBe(15);
+    expect(state.checkedCount).toBe(0);
     expect(state.nameField).toBe(true);
     expect(state.messageField).toBe(true);
     expect(state.hiddenReveals).toBe(0);
@@ -120,7 +123,7 @@ test.describe("skip link (a11y hardening)", () => {
 });
 
 test.describe("mixed-aspect editorial grid (V-1/V-2)", () => {
-  test("work index alternates 8/5 and 3/4 cover aspects in catalog order", async ({ page }) => {
+  test("work index alternates 8/5 and 4/5 cover aspects in catalog order", async ({ page }) => {
     await page.goto("/work");
     const ratios = await page.locator("a[href^='/work/'] img").evaluateAll((imgs) =>
       imgs.map((img) => {
@@ -132,7 +135,8 @@ test.describe("mixed-aspect editorial grid (V-1/V-2)", () => {
     );
     expect(ratios).toHaveLength(PROJECTS.length);
     PROJECTS.forEach((project, i) => {
-      const expected = project.coverAspect === "landscape" ? 8 / 5 : 3 / 4;
+      // Source-measured portrait ratio is 0.80 (4:5).
+      const expected = project.coverAspect === "landscape" ? 8 / 5 : 4 / 5;
       expect(
         ratios[i],
         `${project.slug} (${project.coverAspect}) at index ${i}: ${ratios[i]}`,
@@ -142,6 +146,29 @@ test.describe("mixed-aspect editorial grid (V-1/V-2)", () => {
     expect(new Set(ratios.map((r) => r.toFixed(2))).size).toBe(2);
   });
 
+  test("case-study hero renders the uniform 7:3 wide banner", async ({ page }) => {
+    await page.goto("/work/alder-pine");
+    const ratio = await page
+      .locator("main img")
+      .first()
+      .evaluate((img) => {
+        const [a, b = "1"] = getComputedStyle(img).aspectRatio.split("/").map((p) => p.trim());
+        return Number(a) / Number(b);
+      });
+    expect(ratio).toBeCloseTo(7 / 3, 2);
+  });
+
+  test("project cards speak the minimal editorial meta grammar", async ({ page }) => {
+    await page.goto("/work");
+    const first = page.locator("a[href^='/work/']").first();
+    await expect(first.getByRole("heading", { name: "Alder & Pine" })).toBeVisible();
+    // Uppercase practice line + year; no index, no summary, no tag soup.
+    await expect(first.getByText("Brand Identity · Packaging & Print")).toBeVisible();
+    await expect(first).toContainText("2024");
+    await expect(first).not.toContainText("boutique home goods studio");
+    await expect(first).not.toContainText("01");
+  });
+
   test("home marquee is a mixed-shape gallery, not a row of clones", async ({ page }) => {
     await page.goto("/");
     const heights = await page
@@ -149,7 +176,7 @@ test.describe("mixed-aspect editorial grid (V-1/V-2)", () => {
       .evaluateAll((nodes) =>
         nodes.slice(0, 24).map((node) => parseFloat(getComputedStyle(node.firstElementChild as HTMLElement).height)),
       );
-    // tall(236px) / wide(180px) / landscape(148px) / tile(176px) mix.
+    // tall 4:5 (220px) / wide 5:4 (232px) / landscape 4:3 (192px) / tile square (176px) mix.
     const distinct = new Set(heights);
     expect(distinct.size).toBeGreaterThanOrEqual(3);
   });

@@ -1,116 +1,111 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Investment estimator — the DBS counterpart of home-financing's calculator
- * e2e coverage. The pricing math itself is unit-tested (vitest, 9 cases);
- * these specs pin the WIRING: step machine, radio semantics, the live
- * estimate region, deep-link preselect, and the exact display strings the
- * pure layer produces (formatRange: "$33k – $55k").
+ * Investment estimator — static four-group form (pass-2 parity redesign).
+ * The source site renders ALL groups simultaneously (1 Project type /
+ * 2 Business stage / 3 Timeline / 4 Deliverables) and gates the estimate
+ * until every group has a selection. The pricing math itself is unit-tested
+ * (vitest); these specs pin the static wiring: group visibility, radio
+ * semantics, gated estimate, label parity (durations, "Core Essentials"),
+ * and the deep-link preselect.
  */
 
 const estimateRegion = (page: Page) =>
-  page.locator('[aria-live="polite"]').filter({ hasText: "Estimated starting range" });
+  page.locator('[aria-live="polite"]').filter({ hasText: /estimate/i });
 
-test.describe("estimator wiring", () => {
-  test("renders the four-step shell with priced service options", async ({ page }) => {
+test.describe("estimator static form", () => {
+  test("renders all four numbered groups with all fifteen options visible", async ({ page }) => {
     await page.goto("/contact");
-    await expect(page.getByText("Investment estimator")).toBeVisible();
-    await expect(page.getByText("What does the project need?")).toBeVisible();
-    await expect(page.getByText("Step 1 of 4 — Service")).toBeVisible();
-    // Step indicator is a real ordered list with the active step marked.
-    await expect(page.getByRole("list", { name: "Estimator steps" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "1", exact: true })).toHaveAttribute(
-      "aria-current",
-      "step",
-    );
-    // Service options carry their base ranges (compact format, en dash).
-    await expect(page.getByRole("radio", { name: /Brand Identity/ })).toContainText(
-      "$30k–$50k",
-    );
-    await expect(page.getByRole("radio", { name: /Art Direction/ })).toContainText("$15k–$30k");
+    for (const group of ["Project type", "Business stage", "Timeline", "Deliverables"]) {
+      await expect(page.getByRole("radiogroup", { name: group })).toBeVisible();
+    }
+    // Every option is on the page at once — no step machine.
+    await expect(page.getByRole("radio")).toHaveCount(15);
+    // Timeline labels carry durations (source parity).
+    await expect(page.getByRole("radio", { name: /Flexible \(12\+ weeks\)/ })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Rush \(under 6 weeks\)/ })).toBeVisible();
+    // Scope label parity.
+    await expect(page.getByRole("radio", { name: "Core Essentials" })).toBeVisible();
   });
 
-  test("default selection shows the honest starting range $33k – $55k", async ({ page }) => {
+  test("estimate is gated until all four groups are selected", async ({ page }) => {
     await page.goto("/contact");
-    // brand-identity (30–50k) × growing (1) × standard (1.1) × comprehensive (1)
+    // Nothing selected: the gate copy shows, no range, no CTA.
+    await expect(estimateRegion(page)).toContainText(
+      "Complete all selections to see your personalized estimate.",
+    );
+    await expect(page.getByRole("link", { name: "Start a project" })).toHaveCount(0);
+
+    // One selection is not enough.
+    await page.getByRole("radio", { name: /Brand Identity/ }).click();
+    await expect(estimateRegion(page)).toContainText(
+      "Complete all selections to see your personalized estimate.",
+    );
+    await page.getByRole("radio", { name: "Growing", exact: true }).click();
+    await page.getByRole("radio", { name: /Standard \(8-12 weeks\)/ }).click();
+    await expect(estimateRegion(page)).toContainText(
+      "Complete all selections to see your personalized estimate.",
+    );
+
+    // All four: the range appears — 30–50k × 1 × 1.1 × 1 → $33k – $55k.
+    await page.getByRole("radio", { name: "Comprehensive", exact: true }).click();
     await expect(estimateRegion(page)).toContainText("$33k – $55k");
-    await expect(page.getByRole("radio", { name: /Brand Identity/ })).toHaveAttribute(
-      "aria-checked",
-      "true",
+    await expect(page.getByRole("link", { name: "Start a project" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start a project" })).toHaveAttribute(
+      "href",
+      "#contact-form",
     );
   });
 
-  test("full walk-through updates the live estimate at every step", async ({ page }) => {
+  test("changing an earlier selection updates the revealed estimate", async ({ page }) => {
     await page.goto("/contact");
-
-    // Step 1 — Visual Design System ($25k–$45k base).
+    await page.getByRole("radio", { name: /Brand Identity/ }).click();
+    await page.getByRole("radio", { name: "Growing", exact: true }).click();
+    await page.getByRole("radio", { name: /Standard \(8-12 weeks\)/ }).click();
+    await page.getByRole("radio", { name: "Comprehensive", exact: true }).click();
+    await expect(estimateRegion(page)).toContainText("$33k – $55k");
+    // Switch service: 25–45k × 1 × 1.1 × 1 → $28k – $50k.
     await page.getByRole("radio", { name: /Visual Design System/ }).click();
-    await expect(page.getByText("Where is the company today?")).toBeVisible();
-    await expect(page.getByText("Step 2 of 4 — Company")).toBeVisible();
-    // 25–45k × 1 × 1.1 × 1 → $28k – $50k (rounded to $1k).
     await expect(estimateRegion(page)).toContainText("$28k – $50k");
-
-    // Step 2 — Startup (×0.8) → 0.88 multiplier.
+    // Switch stage to Startup (×0.8): 0.88 multiplier → $22k – $40k.
     await page.getByRole("radio", { name: "Startup", exact: true }).click();
-    await expect(page.getByText("How should the work be paced?")).toBeVisible();
     await expect(estimateRegion(page)).toContainText("$22k – $40k");
-
-    // Step 3 — Flexible (×1.0 replaces the default standard ×1.1) → 0.8 multiplier.
-    await page.getByRole("radio", { name: "Flexible", exact: true }).click();
-    await expect(page.getByText("How far should the system go?")).toBeVisible();
-    await expect(estimateRegion(page)).toContainText("$20k – $36k");
-
-    // Step 4 — Core (×0.8) → 0.64 multiplier: $16k – $29k, and the CTA lands.
-    await page.getByRole("radio", { name: "Core", exact: true }).click();
-    await expect(estimateRegion(page)).toContainText("$16k – $29k");
-    const cta = page.getByRole("link", { name: "Start a project" });
-    await expect(cta).toBeVisible();
-    await expect(cta).toHaveAttribute("href", "#contact-form");
-    await expect(page.getByText("Step 4 of 4 — Scope")).toBeVisible();
+    // Switch scope to Core Essentials (×0.8): 0.8 × 1.1 × 0.8 = 0.704 → $18k – $32k.
+    await page.getByRole("radio", { name: "Core Essentials" }).click();
+    await expect(estimateRegion(page)).toContainText("$18k – $32k");
   });
 
-  test("back button revisits earlier steps without losing the running estimate", async ({
-    page,
-  }) => {
+  test("selections render checked state per group", async ({ page }) => {
     await page.goto("/contact");
-    await page.getByRole("radio", { name: /Visual Design System/ }).click();
-    await page.getByRole("radio", { name: "Startup", exact: true }).click();
-    await page.getByRole("button", { name: "Back" }).click();
-    await expect(page.getByText("Where is the company today?")).toBeVisible();
-    // Selection survives: Startup stays checked when re-rendered.
-    await expect(page.getByRole("radio", { name: "Startup", exact: true })).toHaveAttribute(
+    const service = page.getByRole("radio", { name: /Art Direction/ });
+    await expect(service).toHaveAttribute("aria-checked", "false");
+    await service.click();
+    await expect(service).toHaveAttribute("aria-checked", "true");
+    // Other groups remain unchecked.
+    await expect(page.getByRole("radio", { name: "Enterprise", exact: true })).toHaveAttribute(
       "aria-checked",
-      "true",
+      "false",
     );
   });
 
-  test("step indicator jumps are direct navigation", async ({ page }) => {
-    await page.goto("/contact");
-    await page.getByRole("button", { name: "3", exact: true }).click();
-    await expect(page.getByText("How should the work be paced?")).toBeVisible();
-    await expect(page.getByRole("button", { name: "3", exact: true })).toHaveAttribute(
-      "aria-current",
-      "step",
-    );
-  });
-
-  test("?service= deep link preselects the estimator service", async ({ page }) => {
-    await page.goto(`/contact?service=art-direction`);
+  test("?service= deep link preselects the service group only", async ({ page }) => {
+    await page.goto("/contact?service=art-direction");
     await expect(page.getByRole("radio", { name: /Art Direction/ })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-    // 15–30k × 1 × 1.1 × 1 → $17k – $33k (16.5k rounds to 17k).
-    await expect(estimateRegion(page)).toContainText("$17k – $33k");
+    // Still incomplete: the estimate stays gated.
+    await expect(estimateRegion(page)).toContainText(
+      "Complete all selections to see your personalized estimate.",
+    );
   });
 
-  test("an invalid ?service= value falls back to the default", async ({ page }) => {
-    await page.goto(`/contact?service=nonexistent-service`);
-    await expect(page.getByRole("radio", { name: /Brand Identity/ })).toHaveAttribute(
-      "aria-checked",
-      "true",
+  test("an invalid ?service= value preselects nothing", async ({ page }) => {
+    await page.goto("/contact?service=nonexistent-service");
+    const checked = await page.getByRole("radio").evaluateAll((radios) =>
+      radios.filter((r) => r.getAttribute("aria-checked") === "true").length,
     );
-    await expect(estimateRegion(page)).toContainText("$33k – $55k");
+    expect(checked).toBe(0);
   });
 
   test("services page deep-links each estimable practice into the estimator", async ({ page }) => {

@@ -116,10 +116,31 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 **ADR-008: Mixed-aspect editorial image rhythm (content-as-code orientation fields)**
 
 - **Context:** Uniform 3:2 landscape thumbnails homogenized the grids, marquee, and case studies — diverging from the reference site's alternating landscape/portrait rhythm and weakening the editorial identity.
-- **Decision:** `Project.coverAspect` (`landscape` | `portrait`) and `details[].aspect` (`wide` | `landscape` | `portrait`) are data fields; render classes derive from them (`aspect-[8/5]`, `aspect-[3/4]`, `aspect-[7/3]`, `aspect-[3/2]`). Portrait artwork files follow a `-portrait` naming contract. The marquee derives item shapes (`tall`/`wide`/`landscape`/square tiles) from the same data.
+- **Decision:** `Project.coverAspect` (`landscape` | `portrait`) and `details[].aspect` (`wide` | `landscape` | `portrait`) are data fields; render classes derive from them (`aspect-[8/5]`, `aspect-[4/5]`, `aspect-[7/3]`, `aspect-[3/2]`). Every case-study hero renders a uniform `aspect-[7/3]` wide banner regardless of cover orientation (pass-2 parity: source-measured 2.33 on every case page, object-cropped). Portrait artwork files follow a `-portrait` naming contract. The marquee derives item shapes (`tall` 4:5 / `wide` 5:4 / `landscape` 4:3 / square tiles) from the same data.
 - **Rationale:** Orientation is a content decision (which image expresses this project), not a layout accident — so it belongs in the data layer where it is typed, tested (alternation and file-integrity invariants), and swappable without touching components.
-- **Consequences:** (+) Grids alternate 1.60/0.75 exactly like the reference; detail imagery mixes wide banners and portrait studies; aspect classes always match source-file orientation (no surprise crops). (−) Adding a project now requires choosing an aspect and, for portraits, a 3:4 source file.
+- **Consequences:** (+) Grids alternate 1.60/0.80 exactly like the reference (pass-2 corrected from 0.75); detail imagery mixes wide banners and portrait studies; case heroes match the source's wide-banner grammar. (−) Adding a project now requires choosing an aspect and, for portraits, a 4:5-croppable source file; portrait covers carry a ≈6% render crop.
 - **Alternatives Rejected:** CSS-only `nth-child` alternation (decouples layout from actual image orientation — crops random images); regenerating all covers as one aspect (loses the rhythm).
+
+---
+
+**ADR-009: Playwright e2e layer validating the production artifact**
+
+- **Context:** The original verification story was unit tests plus manual smoke (curl + agent-browser probes). Visual/interaction parity facts lived in audit documents but had no executable regression guards, and dev-HMR hydration can diverge from the shipped build.
+- **Decision:** Add a Playwright suite (`playwright.config.ts` + `e2e/*.spec.ts`, 81 specs) adapted from the home-financing reference: a managed `next start` webServer on :3002 validates the production build; projects are Desktop Chromium plus a Pixel-7 mobile-emulation project scoped to `mobile.spec.ts` (the responsive fork); workers are serial because contact-API tests mutate shared in-memory rate-limit state (tests spoof unique `x-forwarded-for` values). Specs import `src/data/*` directly so slugs, images, and titles are data-driven. `@playwright/test` is pinned to 1.62.0 (matches the locally cached Chromium 151; bun.lock locks it).
+- **Rationale:** Parity and a11y contracts are only real if a machine re-checks them; testing the built artifact catches hydration/static-generation drift that unit tests cannot; the reference repo's config is a proven pattern worth converging on.
+- **Consequences:** (+) Every audit finding now ships with a named regression guard; the security-header contract, SEO pins, and API discipline are pinned; the estimator and mobile nav are exercised end-to-end. (−) e2e adds ~40s to verification and requires the Chromium binary; with `javaScriptEnabled: false` Playwright locators cannot resolve, so no-JS specs assert through `page.evaluate` (documented in the spec header).
+- **Alternatives Rejected:** Continuing with manual probes (not repeatable in CI); jsdom component tests (cannot validate the built artifact or a11y);
+  parallel workers (rate-limit state races).
+
+---
+
+**ADR-010: Pass-2 parity redesign — static estimator form and editorial layout corrections**
+
+- **Context:** The pass-2 verification audit (docs/AUDIT_VISUAL_PARITY.md § Pass 2) mechanically measured the source site and found the estimator was a static four-group form (not the assumed wizard), the /work index lacked its closing CTA band, portrait covers rendered 0.75 vs the source's 0.80, case heroes were per-project instead of uniform 7:3 wide banners, and several hero/grid compositions were inverted or stacked differently.
+- **Decision:** Rebuild the estimator as a static four-group form (groups 1–4 always visible in a 2×2 column grid, estimate gated until all four groups are selected, `?service=` preselects one group); align contact to single-column fields with the form left / studio info right; make the referral field a select; render timeline labels with durations; adopt the source's measured geometry: portrait 4:5, uniform 7:3 case heroes, 3-column home services and about-approach grids, 5-step horizontal process (adding an original Refinement step), text-left/portrait-right home and about heroes, and the minimal card meta grammar (uppercase practice line + year).
+- **Rationale:** Every change maps to a measured source-site fact (rendered geometry probes), not taste; the audit framework distinguishes design-language parity (fix) from content richness (keep).
+- **Consequences:** (+) All twelve findings closed with e2e regression guards; estimator deep-links and math preserved. (−) The wizard's progressive disclosure is gone (source parity wins); case heroes crop portrait covers harder via `object-cover` (identical to source behavior); richer card summaries moved to case pages only.
+- **Alternatives Rejected:** Keeping the wizard (interaction-model divergence from source); regenerating imagery at new aspect ratios (source itself object-crops its 1280×800 set; no need).
 
 ---
 
@@ -217,7 +238,7 @@ design-brand-strategy/
     │   ├── marquee.tsx              ← 24-item CSS-animated strip [server]
     │   ├── collage-strip.tsx        ← staggered collage + character block [server]
     │   ├── project-card.tsx         ← image-led project card [server]
-    │   ├── estimator.tsx            ← 4-step wizard over pure pricing math [client]
+    │   ├── estimator.tsx            ← static 4-group estimator form over pure pricing math [client]
     │   ├── contact-form.tsx         ← zod-validated inquiry form + honeypot [client]
     │   └── ui.tsx                   ← Container / SectionLabel / ArrowLink / PillLink [server]
     ├── data/
@@ -248,8 +269,8 @@ export function estimateRange(selection: EstimatorSelection): EstimateRange {
 }
 ```
 
-*Why this pattern:* the wizard's state lives in leaf-local `useState`; every visible number is
-derived via `useMemo(() => estimateRange(selection), [selection])`. Business rules never live in
+*Why this pattern:* the estimator's selection state lives in leaf-local `useState`; every visible number is
+derived via `estimateRange(selection)` once the selection is complete. Business rules never live in
 the component, so they are testable without rendering and identical on server and client.
 
 **Pattern 2 — Deterministic pseudo-randomness for SSR-observable content**
@@ -550,7 +571,7 @@ bodies explain "why". The first commit on `main` is the repository owner's promp
 | `src/data/site.ts` | 260 | Persona, services, estimator config, awards — the content source of truth |
 | `src/data/projects.ts` | 370 | 8 case studies + marquee assembly + lookups |
 | `src/app/page.tsx` | 210 | Home page composition (hero → collage → marquee → work → about → services → CTA) |
-| `src/components/estimator.tsx` | 240 | 4-step investment wizard (client) |
+| `src/components/estimator.tsx` | ~230 | Static four-group investment estimator (client) |
 | `src/components/contact-form.tsx` | 300 | Zod-validated inquiry form + honeypot (client) |
 | `src/app/api/contact/route.ts` | 75 | Validation authority + rate limit + delivery integration point |
 | `src/lib/estimator.ts` | 80 | Pure pricing math |
@@ -567,7 +588,7 @@ bodies explain "why". The first commit on `main` is the repository owner's promp
 - **SSG** — Static Site Generation; pages prerendered at build time (`generateStaticParams`).
 - **RSC** — React Server Components; server-only rendering with zero client JS.
 - **Client island** — a `"use client"` subtree (this site has five) inside a server tree.
-- **Estimator** — the four-step investment calculator (service × stage × timeline × scope).
+- **Estimator** — the static four-group investment estimator (project type × business stage × timeline × deliverables) with a gated estimate; see ADR-010.
 - **Character block** — the signature dense alphanumeric texture; deterministic by design.
 - **CSP** — Content Security Policy; this site's policy is emitted in `next.config.ts`.
 - **PAD** — Project Architecture Document (this file).

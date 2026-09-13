@@ -95,29 +95,19 @@ export default function HomePage() {
         <div className="mt-12 grid gap-x-10 gap-y-16 md:grid-cols-2">
           {FEATURED_PROJECTS.map((project, index) => (
             <Reveal key={project.slug} variant="card" delay={index * 60}>
-              <ProjectCard project={project} index={index} />
+              <ProjectCard project={project} />
             </Reveal>
           ))}
         </div>
       </Container>
 
       {/* ------------------------------------------------------------------
-        About teaser — portrait, positioning, and a pull quote.
+        About teaser — positioning and a pull quote left, portrait right
+        (source geometry: text x≈80, portrait x=771).
       ------------------------------------------------------------------ */}
       <Container className="border-t border-border py-20 md:py-28">
         <div className="grid gap-12 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-5">
-            <Reveal variant="card">
-              <Image
-                src="/images/portrait-about.webp"
-                alt="Elena Vance working at a wooden studio desk with typography sketches"
-                width={864}
-                height={1152}
-                className="aspect-[3/4] w-full object-cover"
-              />
-            </Reveal>
-          </div>
-          <div className="flex flex-col justify-center md:col-span-6 md:col-start-7">
+          <div className="flex flex-col justify-center md:col-span-7">
             <Reveal>
               <SectionLabel>About</SectionLabel>
               <h2 className="mt-4 font-serif text-4xl tracking-tight md:text-5xl">
@@ -142,11 +132,23 @@ export default function HomePage() {
               </div>
             </Reveal>
           </div>
+          <div className="md:col-span-5">
+            <Reveal variant="card">
+              <Image
+                src="/images/portrait-about.webp"
+                alt="Elena Vance working at a wooden studio desk with typography sketches"
+                width={864}
+                height={1080}
+                className="aspect-[4/5] w-full object-cover"
+              />
+            </Reveal>
+          </div>
         </div>
       </Container>
 
       {/* ------------------------------------------------------------------
-        Services teaser — the first three practices, numbered editorially.
+        Services teaser — the first three practices as a 3-column row
+        (source geometry: three w=341 cards, name + one-liner).
       ------------------------------------------------------------------ */}
       <Container className="border-t border-border py-20 md:py-28">
         <Reveal>
@@ -159,20 +161,14 @@ export default function HomePage() {
           </div>
         </Reveal>
 
-        <div className="mt-12">
+        <div className="mt-12 grid gap-10 md:grid-cols-3">
           {SERVICES.slice(0, 3).map((service, index) => (
             <Reveal key={service.id} delay={index * 60}>
-              <Link
-                href={`/services#${service.id}`}
-                className="group grid items-baseline gap-3 border-t border-border py-8 last:border-b md:grid-cols-12 md:gap-6"
-              >
-                <span className="text-xs tabular-nums text-muted-foreground md:col-span-1">
-                  {service.number}
-                </span>
-                <h3 className="font-serif text-3xl tracking-tight transition-transform duration-300 group-hover:translate-x-2 md:col-span-5 md:text-4xl">
+              <Link href={`/services#${service.id}`} className="group block">
+                <h3 className="font-serif text-3xl tracking-tight transition-transform duration-300 group-hover:translate-x-2 md:text-4xl">
                   {service.name}
                 </h3>
-                <p className="text-sm leading-relaxed text-muted-foreground md:col-span-5">
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                   {service.tagline}
                 </p>
               </Link>

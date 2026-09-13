@@ -10,6 +10,8 @@ import {
   fieldErrors,
   PROJECT_TYPE_LABELS,
   PROJECT_TYPES,
+  REFERRAL_LABELS,
+  REFERRAL_OPTIONS,
 } from "@/lib/contact";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -110,7 +112,8 @@ export function ContactForm() {
         </p>
       ) : null}
 
-      <div className="grid gap-7 sm:grid-cols-2">
+      {/* Single column — the source stacks every field full-width. */}
+      <div className="grid gap-7">
         <div>
           <label htmlFor="name" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
             Name <span aria-hidden="true">*</span>
@@ -170,7 +173,7 @@ export function ContactForm() {
         />
       </div>
 
-      <div className="grid gap-7 sm:grid-cols-2">
+      <div className="grid gap-7">
         <div>
           <label htmlFor="projectType" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
             Project type <span aria-hidden="true">*</span>
@@ -255,13 +258,16 @@ export function ContactForm() {
         <label htmlFor="referral" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
           How did you find me? <span className="text-muted-foreground/70">(optional)</span>
         </label>
-        <input
-          id="referral"
-          name="referral"
-          type="text"
-          placeholder="A name, a site, a stroke of luck"
-          className={FIELD_CLASS}
-        />
+        <select id="referral" name="referral" defaultValue="" className={FIELD_CLASS}>
+          <option value="" disabled>
+            Select an option
+          </option>
+          {REFERRAL_OPTIONS.map((source) => (
+            <option key={source} value={source}>
+              {REFERRAL_LABELS[source]}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Honeypot — visually and assistively hidden from humans. */}
