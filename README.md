@@ -19,13 +19,15 @@ The site is an original implementation: its code, copy, and imagery are all orig
 | Feature | Description |
 |---------|-------------|
 | ✍️ Editorial design system | Cream/ink token palette, Instrument Serif + Inter, class-based dark mode with no-flash pre-hydration script |
-| 🖼️ 15 original images | AI-generated portraits, studio imagery, and project covers (no third-party assets) |
-| 📐 8 case studies | SSG project pages with challenge/approach/outcome narrative and sticky project meta |
+| 🖼️ 19 original images | AI-generated portraits, studio imagery, and project covers in WebP (no third-party assets) |
+| 📐 8 case studies | SSG project pages with challenge/approach/outcome narrative, sticky meta, and mixed wide/landscape/portrait detail imagery |
+| 🧱 Mixed-aspect editorial rhythm | Covers alternate landscape (8:5) and portrait (3:4) across grids and the marquee gallery strip |
 | 🧮 Investment estimator | 4-step wizard; pure, unit-tested pricing math (service × stage × timeline × scope) |
 | 📮 Inquiry form | Shared zod schema client + server, honeypot, per-IP rate limiting (5 / 10 min) |
+| ❓ Process + FAQ | Services page documents the four-step engagement process and six common questions (native `<details>`, zero JS) |
 | 🔒 Hardened headers | CSP, HSTS, X-Frame-Options, nosniff, Referrer-/Permissions-Policy emitted by the app |
-| ♿ Accessibility | Semantic landmarks, aria states, focus-visible rings, reduced-motion guards on every animation |
-| 🧪 Verified | 18 unit tests, strict TypeScript, clean ESLint, production smoke test |
+| ♿ Accessibility | Skip-to-content link, semantic landmarks, aria states, focus-visible rings, no-JS reveal guard, reduced-motion guards |
+| 🧪 Verified | 44 unit tests, strict TypeScript, clean ESLint, production smoke test |
 
 ## Architecture
 
@@ -67,22 +69,22 @@ No database, no external services. The `/api/contact` handler validates and rate
  ┃ ┣ 📄 page.tsx            # Home: hero, collage, marquee, work, about, services, CTA
  ┃ ┣ 📄 globals.css         # Design tokens (@theme inline), dark mode, motion guards
  ┃ ┣ 📂 work/[slug]/        # 8 SSG case studies (generateStaticParams)
- ┃ ┣ 📂 about/ services/    # Studio, approach, recognition / six practices
+ ┃ ┣ 📂 about/ services/    # Studio, approach, recognition / six practices + process + FAQ + CTA
  ┃ ┣ 📂 contact/            # Estimator + inquiry form (dynamic via ?service=)
  ┃ ┣ 📂 api/contact/        # zod validation + rate limiting (202/400/429)
  ┃ ┣ 📂 api/health/         # Liveness probe
  ┃ ┗ 📄 sitemap.ts robots.ts error.tsx loading.tsx not-found.tsx icon.svg
- ┣ 📂 components/           # 12 components — only 5 are client components
- ┃ ┗ 📄 estimator.tsx contact-form.tsx reveal.tsx marquee.tsx collage-strip.tsx …
+ ┣ 📂 components/           # 11 components — only 5 are client components
+ ┃ ┗ 📄 estimator.tsx contact-form.tsx reveal.tsx marquee.tsx cta-band.tsx collage-strip.tsx …
  ┣ 📂 data/
- ┃ ┣ 📄 site.ts             # Persona, nav, 6 services, estimator config, awards
- ┃ ┗ 📄 projects.ts         # 8 case studies + marquee sequence
+ ┃ ┣ 📄 site.ts             # Persona, nav, 6 services, estimator config, process, FAQ, awards
+ ┃ ┗ 📄 projects.ts         # 8 case studies (mixed aspects) + marquee sequence
  ┗ 📂 lib/
    ┣ 📄 estimator.ts        # Pure pricing math (+ tests)
-   ┣ 📄 contact.ts          # Shared zod schema (+ tests)
+   ┣ 📄 contact.ts          # Shared zod schema + option labels (+ tests)
    ┣ 📄 char-block.ts       # Deterministic seeded text (hydration-safe)
    └ 📄 rate-limit.ts       # Bounded in-memory limiter
-📂 public/images/           # 15 generated PNGs
+📂 public/images/           # 19 generated WebP originals
 ```
 
 ## Quick Start
@@ -112,7 +114,7 @@ Requires Node.js ≥ 20 and Bun ≥ 1.1.
 **Verify setup**
 
 ```bash
-bun run test        # → Test Files 2 passed (2), Tests 18 passed (18)
+bun run test        # → Test Files 6 passed (6), Tests 44 passed (44)
 bun run build       # → ✓ Compiled successfully, 20 routes generated
 bun run start & curl -s localhost:3000/api/health
                     # → {"ok":true,"service":"design-brand-strategy",...}
@@ -127,7 +129,8 @@ bun run start & curl -s localhost:3000/api/health
 ## Testing
 
 ```bash
-bun run test              # full unit suite (estimator math, schema contract)
+bun run test              # full unit suite (estimator math, schema + labels, data
+                          # contracts, sitemap determinism, no-JS reveal guards)
 bunx vitest run estimator # single file
 ```
 
@@ -147,7 +150,9 @@ errors), and a page sweep for 200s + security headers on all routes.
 
 Typography: **Instrument Serif** (400 + italic) for display/headlines; **Inter** (variable) for body, labels (11–13px, `tracking-[0.2em]`), and UI. Both loaded via `next/font` (self-hosted, `display: swap`).
 
-Motion: `marquee` keyframe (56s linear loop, hover-pause), 300ms reveal transitions, `link-underline` background-size animation — all disabled under `prefers-reduced-motion` via CSS.
+Motion: `marquee` keyframe (56s linear loop, hover-pause), 300ms reveal transitions, `link-underline` background-size animation — all disabled under `prefers-reduced-motion` via CSS. Reveal content stays visible when JavaScript is unavailable (dual fail-open guards: `html:not(.js)` and `@media (scripting: none)`).
+
+Image rhythm: project covers alternate landscape (8:5) and portrait (3:4); case-study details mix wide banners (7:3), landscape (3:2), and portrait (3:4); the marquee renders tall/wide/landscape/square shapes as a mixed gallery.
 
 ## Contact form — production wiring
 

@@ -88,9 +88,9 @@ Node ≥ 20 / Bun ≥ 1.1. No database, no migrations, no env required to run lo
 
 ### Test Pyramid
 
-- **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema (`contact.test.ts`), plus derived data invariants.
+- **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema + option labels (`contact.test.ts`), data contracts (project aspect alternation, marquee shapes, process/FAQ data, image-path integrity — `src/data/*.test.ts`), sitemap determinism (`src/app/sitemap.test.ts`), and source-reading markup guards for the no-JS reveal fallback and skip link (`src/lib/reveal-guard.test.ts`).
 - **Integration/API (manual smoke)**: `POST /api/contact` contract (202 valid / 400 invalid with field errors / 429 over-limit) and route health, exercised against `bun run start`.
-- **E2E (not configured)**: add Playwright only when interaction regressions justify the maintenance.
+- **E2E (not configured)**: add Playwright only when interaction regressions justify the maintenance; the current agent-browser probe scripts cover the same ground on demand.
 
 ### Test Commands
 
@@ -105,8 +105,9 @@ Tests live beside their modules as `*.test.ts`; vitest config resolves `@` → `
 ### Writing tests
 
 - Derive numeric expectations from the multiplier tables with the arithmetic written in a comment beside the assertion (see `estimator.test.ts`).
-- Test the public API of pure functions; do not test React markup.
-- Schema tests must cover: valid baseline, each invalid field, optional-field defaults, trimming, and the field-error flattening contract used by both client and API.
+- Test the public API of pure functions; do not test React markup. For markup/CSS contracts that vitest cannot mount (no jsdom), use source-reading tests — see `reveal-guard.test.ts` for the pattern.
+- Schema tests must cover: valid baseline, each invalid field, optional-field defaults, trimming, and the field-error flattening contract used by both client and API. Enum label maps must be exhaustiveness-tested against their enums.
+- Data-contract tests fail loudly when content is added without required fields (aspect orientation, image files) — extend them when introducing new data invariants.
 
 ## Code Quality Standards
 

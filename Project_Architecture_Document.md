@@ -93,13 +93,33 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 - **Consequences:** (+) Zero hydration mismatches by construction. (−) The character block is static per build (the intent — it is a texture, not entropy).
 - **Alternatives Rejected:** `useEffect`-generated random text (flash of empty block, layout shift); `Math.random` with a seed library (unnecessary dependency).
 
-**ADR-006: `images.unoptimized: true` while still using `next/image`**
+**ADR-006: `images.unoptimized: true` while still using `next/image`, assets pre-encoded as WebP**
 
-- **Context:** Fifteen PNGs (~76–231 kB each) drive the visual design. The build must run anywhere without native image codecs.
-- **Decision:** `next.config.ts` sets `images.unoptimized: true`; all raster images still use `next/image` with explicit width/height and `object-cover`.
-- **Rationale:** Removes the sharp/libvips dependency from the runtime (portable builds/deploys, no postinstall surprises) while keeping `next/image`'s layout-stability and lazy-loading benefits. Source images are already sized to their display slots (768×1344 portraits, 1344×768 covers), so optimizer value is marginal.
-- **Consequences:** (+) Dependency-light, reproducible builds. (−) No automatic WebP/AVIF or responsive variants — page weight is higher than an optimized pipeline (see §10 for the deferred task).
-- **Alternatives Rejected:** Default optimizer (couples deploys to native binaries); hand-rolled `<img>` (loses layout guarantees); committing pre-encoded WebP (dual sources of truth for art direction).
+- **Context:** Nineteen originals (~54–255 kB each) drive the visual design. The build must run anywhere without native image codecs.
+- **Decision:** `next.config.ts` sets `images.unoptimized: true`; all raster images still use `next/image` with explicit width/height and `object-cover`. Assets are committed as WebP (q85) rather than PNG.
+- **Rationale:** Removes the sharp/libvips dependency from the runtime (portable builds/deploys, no postinstall surprises) while keeping `next/image`'s layout-stability and lazy-loading benefits. Source images are sized to their display slots (864×1152 portraits, 1344×840 landscape covers). Pre-encoded WebP keeps the format win without an optimizer; measured delta vs PNG was modest (2694 kB → 2442 kB, ~9%) because the editorial imagery compresses efficiently either way.
+- **Consequences:** (+) Dependency-light, reproducible builds; smaller, modern-format assets. (−) No automatic responsive variants — a host with a native optimizer can still do better. OG consumers must support WebP (all major platforms do).
+- **Alternatives Rejected:** Default optimizer (couples deploys to native binaries); hand-rolled `<img>` (loses layout guarantees); keeping PNG (larger, no benefit measured).
+
+---
+
+**ADR-007: Fail-open no-JS reveal guards**
+
+- **Context:** The `Reveal` component starts content at `opacity: 0` until its IntersectionObserver fires. Scripting-disabled visitors (and non-rendering crawlers) saw a hero-only page.
+- **Decision:** Two independent CSS guards force `[data-reveal]` visible without JS: `html:not(.js) [data-reveal]` (the inline boot script adds a `js` class pre-paint — universal coverage, including browsers without `scripting` support) and `@media (scripting: none)` (CSS Media Queries Level 4; Chrome 120+/Safari 17+/Firefox 113+).
+- **Rationale:** Both mechanisms fail open — if the script never runs, content is visible. No hydration-surface change: the guards live in CSS, the class is added before first paint, and the reduced-motion block is unchanged.
+- **Consequences:** (+) No-JS users, crawlers, and pre-hydration snapshots see full content. (−) Two mechanisms to keep synchronized — pinned by source-reading tests so drift is caught in CI/local runs.
+- **Alternatives Rejected:** JS-only check in the component (still invisible without JS); `noscript` style block (page-wide override, coarser).
+
+---
+
+**ADR-008: Mixed-aspect editorial image rhythm (content-as-code orientation fields)**
+
+- **Context:** Uniform 3:2 landscape thumbnails homogenized the grids, marquee, and case studies — diverging from the reference site's alternating landscape/portrait rhythm and weakening the editorial identity.
+- **Decision:** `Project.coverAspect` (`landscape` | `portrait`) and `details[].aspect` (`wide` | `landscape` | `portrait`) are data fields; render classes derive from them (`aspect-[8/5]`, `aspect-[3/4]`, `aspect-[7/3]`, `aspect-[3/2]`). Portrait artwork files follow a `-portrait` naming contract. The marquee derives item shapes (`tall`/`wide`/`landscape`/square tiles) from the same data.
+- **Rationale:** Orientation is a content decision (which image expresses this project), not a layout accident — so it belongs in the data layer where it is typed, tested (alternation and file-integrity invariants), and swappable without touching components.
+- **Consequences:** (+) Grids alternate 1.60/0.75 exactly like the reference; detail imagery mixes wide banners and portrait studies; aspect classes always match source-file orientation (no surprise crops). (−) Adding a project now requires choosing an aspect and, for portraits, a 3:4 source file.
+- **Alternatives Rejected:** CSS-only `nth-child` alternation (decouples layout from actual image orientation — crops random images); regenerating all covers as one aspect (loses the rhythm).
 
 ---
 
@@ -403,10 +423,13 @@ API surface accepts only the contact payload and answers health checks.
 | Category | Files | Tests | Location | Framework |
 |----------|-------|-------|----------|-----------|
 | Estimator math | 1 | 9 | `src/lib/estimator.test.ts` | Vitest (node env) |
-| Contact schema | 1 | 9 | `src/lib/contact.test.ts` | Vitest (node env) |
+| Contact schema + labels | 1 | 11 | `src/lib/contact.test.ts` | Vitest (node env) |
+| Data contracts (aspects, marquee, process, FAQ) | 2 | 18 | `src/data/projects.test.ts`, `src/data/site.test.ts` | Vitest (node env) |
+| No-JS/skip-link markup guards | 1 | 5 | `src/lib/reveal-guard.test.ts` (source-reading) | Vitest (node env) |
+| Sitemap determinism | 1 | 3 | `src/app/sitemap.test.ts` | Vitest (node env) |
 | API contract | — | manual smoke | `bun run start` + curl | — |
 | Route health / headers | — | manual smoke | curl sweep | — |
-| Visual | — | manual QA | screenshots + VLM review | — |
+| Visual / interaction | — | agent-browser probes | scripts + screenshots + VLM review | — |
 
 ### 7.2 Test Patterns
 
@@ -419,7 +442,9 @@ share. The fail-fast contract is tested explicitly (`RangeError` on unknown ids)
 ### 7.3 Coverage Thresholds
 
 No numeric gate is configured; the standard is: **every branch of `src/lib` logic is exercised**
-(currently 18 tests covering both modules' public APIs). Rendering is covered by the build's
+and **every data-layer contract is pinned by tests** (currently 44 tests across 6 files covering
+the estimator, the schema + label maps, project aspect invariants, services/FAQ data, sitemap
+determinism, and the no-JS markup guards). Rendering is covered by the build's
 prerender step (a page that fails to render fails the build).
 
 ### 7.4 Pre-PR / Pre-Deploy Checklist
@@ -509,11 +534,11 @@ bodies explain "why". The first commit on `main` is the repository owner's promp
 | Priority | Issue | Impact | Status |
 |----------|-------|--------|--------|
 | HIGH | Contact inquiries are logged, not delivered — email/CRM provider must be wired at the `contact_inquiry` log line (`src/app/api/contact/route.ts`) | Production inquiries unreachable without integration | Open (documented integration point) |
-| MEDIUM | Images served as unoptimized PNGs (ADR-006) — no WebP/AVIF/responsive variants | Higher page weight than necessary (~2.5 MB imagery total) | Open (revisit when a host with native optimizer is chosen) |
 | MEDIUM | No CI pipeline — quality gates are local-only (§7.4) | Gate adherence depends on discipline | Open |
 | LOW | In-memory rate limit is per-instance | Limit is N×5 with N instances behind a load balancer | Open (acceptable at expected traffic) |
 | LOW | Marquee `aria-hidden` on duplicated track half only; screen readers announce items once | Minor a11y polish possible | Open |
-| LOW | OG/Twitter images reuse studio photography rather than branded cards | Suboptimal link previews on social | Open |
+
+> Resolved 2026-09-13 (remediation pass 1): no-JS reveal trap (ADR-007), unoptimized PNGs → pre-encoded WebP (ADR-006), shared OG image → per-page OG images, missing skip-to-content link, select-field error wiring, hardcoded email fallbacks. See `docs/AUDIT_CODE_REVIEW.md`, `docs/AUDIT_VISUAL_PARITY.md`, and `docs/REMEDIATION_PLAN.md` for the full record.
 
 ---
 
