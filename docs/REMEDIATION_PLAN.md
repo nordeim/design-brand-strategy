@@ -117,9 +117,9 @@ After new images are generated: convert all `public/images/*.png` to WebP (Pillo
 - [x] G5. `docs/REMEDIATION_PLAN.md` — mark items complete with evidence.
 
 **Phase H — Ship**
-- [ ] H1. Commit sequence on `main` (5 commits: tests+data / imagery+components / verification fixes / docs / final gates) with imperative messages.
-- [ ] H2. SSH wrapper push to `git@github.com:nordeim/design-brand-strategy.git` (main only, no new branches).
-- [ ] H3. Post-push verification: remote HEAD hash match; clean tree.
+- [x] H1. Commit sequence on `main` (5 commits: tests+data / imagery+components / verification fixes / docs / final gates) with imperative messages.
+- [x] H2. SSH wrapper push to `git@github.com:nordeim/design-brand-strategy.git` (main only, no new branches).
+- [x] H3. Post-push verification: remote HEAD hash match; clean tree.
 
 ## 4. Alignment validation (to re-run before execution)
 
@@ -155,3 +155,10 @@ Each planned change was mapped to its actual target (file + current code) during
 **Phase G (Docs):** SKILL.md → v2.0.0; README/PAD/AGENTS/CLAUDE realigned; audit-history appendix updated.
 
 **Phase H (Ship):** commits to main + SSH push (recorded below after execution).
+
+**Phase H (Ship) record:** two commits on `main` (no new branches):
+- `4d7572c` — feat: remediation pass 1 (58 files, +817/−231: src + 19 WebP images)
+- `c3f10fb` — docs: SKILL.md v2 + audit reports + realigned docs (8 files, +1867/−33)
+
+Pushed via the paramiko SSH wrapper to `git@github.com:nordeim/design-brand-strategy.git`;
+remote `origin/main` verified equal to local (`c3f10fb`), working tree clean.
