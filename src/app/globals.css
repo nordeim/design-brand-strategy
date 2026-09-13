@@ -118,6 +118,25 @@ body {
 /* ---------------------------------------------------------------------------
  * Motion safety
  * ------------------------------------------------------------------------ */
+
+/*
+ * Scripting-disabled safety (fail-open): without JavaScript the reveal
+ * wrappers must never trap content in the hidden state. Two independent
+ * guards — the js marker class set by the inline boot script (universal),
+ * and the scripting media query (modern browsers). Reduced motion below.
+ */
+html:not(.js) [data-reveal] {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+@media (scripting: none) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

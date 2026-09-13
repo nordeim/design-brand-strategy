@@ -23,6 +23,26 @@ export const BUDGET_RANGES = [
   "not-sure",
 ] as const;
 
+/** Display labels for the project type options — lives beside the enum it labels. */
+export const PROJECT_TYPE_LABELS: Record<(typeof PROJECT_TYPES)[number], string> = {
+  "brand-identity": "Brand Identity",
+  "visual-design-system": "Visual Design System",
+  "art-direction": "Art Direction",
+  "brand-guidelines": "Brand Guidelines",
+  "naming-verbal-identity": "Naming & Verbal Identity",
+  "packaging-print": "Packaging & Print",
+  other: "Something else",
+};
+
+/** Display labels for the budget range options — lives beside the enum it labels. */
+export const BUDGET_LABELS: Record<(typeof BUDGET_RANGES)[number], string> = {
+  "under-25k": "Under $25k",
+  "25-50k": "$25k – $50k",
+  "50-100k": "$50k – $100k",
+  "100k-plus": "$100k+",
+  "not-sure": "Not sure yet",
+};
+
 export const contactSchema = z.object({
   name: z
     .string()

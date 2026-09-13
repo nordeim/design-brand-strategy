@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { Metadata } from "next";
 
+import { CtaBand } from "@/components/cta-band";
 import { Reveal } from "@/components/reveal";
 import { ArrowLink, Container, SectionLabel } from "@/components/ui";
 import { APPROACH_PRINCIPLES, AWARDS, BEYOND_WORK, SITE } from "@/data/site";
@@ -9,6 +10,16 @@ export const metadata: Metadata = {
   title: "About",
   description:
     "Elena Vance is an independent designer and brand strategist in New York — identity systems, design systems, and art direction for ambitious companies.",
+  openGraph: {
+    images: [
+      {
+        url: "/images/portrait-about.webp",
+        width: 864,
+        height: 1152,
+        alt: "Elena Vance working at a wooden studio desk",
+      },
+    ],
+  },
 };
 
 export default function AboutPage() {
@@ -26,7 +37,7 @@ export default function AboutPage() {
           <div className="md:col-span-5">
             <Reveal variant="card">
               <Image
-                src="/images/portrait-main.png"
+                src="/images/portrait-main.webp"
                 alt="Studio portrait of Elena Vance"
                 width={768}
                 height={1344}
@@ -142,6 +153,19 @@ export default function AboutPage() {
           ))}
         </div>
       </Container>
+
+      {/* Closing CTA — light muted band with the ink pill action. */}
+      <CtaBand
+        label={SITE.availability}
+        title={
+          <>
+            The studio keeps a <em className="italic">small</em> list.
+          </>
+        }
+        body="A handful of engagements a year, each with full attention. If the fit is right, the next step is a thirty-minute conversation about where the business is headed — and an honest answer about whether I'm the right designer for it."
+        href="/contact"
+        linkText="Work with me"
+      />
     </>
   );
 }

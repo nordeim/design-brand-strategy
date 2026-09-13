@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { contactSchema, fieldErrors } from "@/lib/contact";
+import {
+  BUDGET_LABELS,
+  BUDGET_RANGES,
+  contactSchema,
+  fieldErrors,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPES,
+} from "@/lib/contact";
 
 const VALID = {
   name: "Jordan Avery",
@@ -11,6 +18,16 @@ const VALID = {
   message: "We are relaunching our brand this year and need a full identity system.",
   referral: "A friend in the industry",
 };
+
+describe("option label maps", () => {
+  it("labels every project type with no extras", () => {
+    expect(Object.keys(PROJECT_TYPE_LABELS).sort()).toEqual([...PROJECT_TYPES].sort());
+  });
+
+  it("labels every budget range with no extras", () => {
+    expect(Object.keys(BUDGET_LABELS).sort()).toEqual([...BUDGET_RANGES].sort());
+  });
+});
 
 describe("contactSchema", () => {
   it("accepts a complete, valid submission", () => {

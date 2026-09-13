@@ -1,24 +1,37 @@
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import { CtaBand } from "@/components/cta-band";
 import { Reveal } from "@/components/reveal";
 import { Container, SectionLabel } from "@/components/ui";
-import { SERVICES } from "@/data/site";
+import { FAQ_ITEMS, PROCESS_STEPS, SERVICES } from "@/data/site";
 
 export const metadata: Metadata = {
   title: "Services",
   description:
     "Brand identity, visual design systems, art direction, brand guidelines, naming, and packaging — six practices, one standard of care.",
+  openGraph: {
+    images: [
+      {
+        url: "/images/detail-typography.webp",
+        width: 1344,
+        height: 768,
+        alt: "Letterpress type blocks in a wooden tray",
+      },
+    ],
+  },
 };
 
 export default function ServicesPage() {
   return (
-    <Container className="py-16 md:py-24">
-      <Reveal>
-        <SectionLabel>Services</SectionLabel>
-        <h1 className="mt-4 max-w-[20ch] font-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] tracking-tight">
-          Six practices, one standard of care.
-        </h1>
+    <>
+      <Container className="py-16 md:py-24">
+        <Reveal>
+          <SectionLabel>Services</SectionLabel>
+          <h1 className="mt-4 max-w-[20ch] font-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] tracking-tight">
+            Six practices, one standard of care.
+          </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-relaxed text-muted-foreground">
           Engagements are scoped to the decision in front of you — never to a fixed package. Each
           practice below can stand alone or combine; most engagements draw on two or three. Ranges
@@ -91,6 +104,85 @@ export default function ServicesPage() {
           </Reveal>
         ))}
       </div>
-    </Container>
+      </Container>
+
+      {/* ------------------------------------------------------------------
+        How we work together — the four-step engagement process.
+      ------------------------------------------------------------------ */}
+      <Container className="border-t border-border py-16 md:py-24">
+        <Reveal>
+          <SectionLabel>Process</SectionLabel>
+          <h2 className="mt-4 font-serif text-4xl tracking-tight md:text-5xl">
+            How we work together
+          </h2>
+        </Reveal>
+
+        <div className="mt-12">
+          {PROCESS_STEPS.map((step, index) => (
+            <Reveal key={step.number} delay={index * 60}>
+              <div className="grid gap-4 border-t border-border py-10 last:border-b md:grid-cols-12 md:gap-8">
+                <span className="text-xs tabular-nums text-muted-foreground md:col-span-1">
+                  {step.number}
+                </span>
+                <h3 className="font-serif text-3xl tracking-tight md:col-span-4 md:text-4xl">
+                  {step.title}
+                </h3>
+                <p className="text-sm leading-relaxed text-muted-foreground md:col-span-7">
+                  {step.body}
+                </p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </Container>
+
+      {/* ------------------------------------------------------------------
+        Common questions — native details/summary accordions, zero JS.
+      ------------------------------------------------------------------ */}
+      <Container className="border-t border-border py-16 md:py-24">
+        <Reveal>
+          <SectionLabel>Common questions</SectionLabel>
+          <h2 className="mt-4 font-serif text-4xl tracking-tight md:text-5xl">
+            Answers, before you ask
+          </h2>
+        </Reveal>
+
+        <div className="mt-12 max-w-3xl">
+          {FAQ_ITEMS.map((item, index) => (
+            <Reveal key={item.question} delay={index * 40}>
+              <details className="group border-t border-border py-6 last:border-b">
+                <summary className="flex cursor-pointer list-none items-baseline justify-between gap-6 [&::-webkit-details-marker]:hidden">
+                  <span className="font-serif text-xl leading-snug tracking-tight md:text-2xl">
+                    {item.question}
+                  </span>
+                  <ChevronDown
+                    className="h-4 w-4 flex-none text-muted-foreground transition-transform duration-300 group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
+                  {item.answer}
+                </p>
+              </details>
+            </Reveal>
+          ))}
+        </div>
+      </Container>
+
+      {/* ------------------------------------------------------------------
+        Closing CTA — light muted band with the ink pill action.
+      ------------------------------------------------------------------ */}
+      <CtaBand
+        label="Next step"
+        title={
+          <>
+            The work starts with a <em className="italic">question</em>.
+          </>
+        }
+        body="Set expectations with the investment estimator, then send a few lines about where the business is headed. Every engagement begins with a scoping call and a written proposal — scope, timing, and investment agreed before any work begins."
+        href="/contact"
+        linkText="Start a project"
+      />
+    </>
   );
 }

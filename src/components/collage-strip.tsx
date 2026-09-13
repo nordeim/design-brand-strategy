@@ -15,7 +15,7 @@ export function CollageStrip() {
         <figure className="md:col-span-4 md:translate-y-6">
           <div className="overflow-hidden">
             <Image
-              src="/images/workspace.png"
+              src="/images/workspace.webp"
               alt="Studio desk with printed brand collateral, color swatches, and type specimen books"
               width={1344}
               height={768}

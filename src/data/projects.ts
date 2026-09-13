@@ -17,13 +17,21 @@ export type Project = {
   summary: string;
   cover: string;
   coverAlt: string;
+  /** Rendered cover orientation — drives the mixed editorial grid rhythm. */
+  coverAspect: "landscape" | "portrait";
   services: string[];
   deliverables: string[];
   overview: string[];
   challenge: string;
   solution: string;
   outcome: string;
-  details: ReadonlyArray<{ src: string; alt: string; caption: string }>;
+  details: ReadonlyArray<{
+    src: string;
+    alt: string;
+    caption: string;
+    /** Rendered orientation: wide banners, landscape, or portrait studies. */
+    aspect: "wide" | "landscape" | "portrait";
+  }>;
   featured: boolean;
 };
 
@@ -36,7 +44,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Home Goods",
     location: "Portland, OR",
     summary: "A letterpress-inflected identity for a boutique home goods studio expanding from market stall to national retail.",
-    cover: "/images/alder-pine-cover.png",
+    cover: "/images/alder-pine-cover.webp",
+    coverAspect: "landscape",
     coverAlt: "Letterpress business cards and letterhead in warm sage and cream tones on natural linen",
     services: ["Brand Identity", "Packaging & Print"],
     deliverables: ["Identity system", "Packaging suite", "Stationery program", "Retail guidelines"],
@@ -52,14 +61,16 @@ export const PROJECTS: readonly Project[] = [
       "Alder & Pine entered 40 new retail doors in the year following launch, with packaging that buyers photograph unprompted. The founders report that the most common customer comment — 'the box was too nice to throw away' — now doubles as their positioning statement.",
     details: [
       {
-        src: "/images/detail-monogram.png",
+        src: "/images/detail-monogram.webp",
         alt: "Blind-deboss monogram pressed into thick cotton paper",
         caption: "The debossed monogram, applied blind on cotton stock — no ink, all pressure.",
+        aspect: "wide",
       },
       {
-        src: "/images/detail-palette.png",
-        alt: "Hand-painted color palette study cards in warm neutral tones",
-        caption: "Palette studies painted by hand before being translated into ink and thread colors.",
+        src: "/images/detail-alder-pine-portrait.webp",
+        alt: "Sage and cream letterpress stationery pieces arranged vertically on natural linen",
+        caption: "The wholesale stationery program — sage and cream, letterpress throughout.",
+        aspect: "portrait",
       },
     ],
     featured: true,
@@ -72,7 +83,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Architecture",
     location: "Chicago, IL",
     summary: "A drafting-inspired identity and design system for an architecture practice moving from residential to civic work.",
-    cover: "/images/vantage-cover.png",
+    cover: "/images/vantage-portrait.webp",
+    coverAspect: "portrait",
     coverAlt: "Architectural brand poster with bold serif typography and drafting lines on off-white paper",
     services: ["Brand Identity", "Visual Design System"],
     deliverables: ["Identity system", "Design tokens", "Template library", "Proposal suite"],
@@ -88,14 +100,16 @@ export const PROJECTS: readonly Project[] = [
       "Vantage won two of the three civic projects it was shortlisted for in the following year, and credits the submission system directly. Internally, document production time dropped by roughly a third once the template library replaced ad-hoc layouts.",
     details: [
       {
-        src: "/images/detail-pattern.png",
+        src: "/images/detail-pattern.webp",
         alt: "Minimal geometric brand pattern of fine black lines with rust accents on textured cream paper",
         caption: "The drafting-line pattern, used at varying densities as a signature texture.",
+        aspect: "wide",
       },
       {
-        src: "/images/detail-typography.png",
-        alt: "Macro photograph of large letterpress type blocks arranged in a wooden tray",
-        caption: "Type studies for the wordmark, proofed in letterpress to test true stroke weights.",
+        src: "/images/detail-vantage-portrait.webp",
+        alt: "Architectural drafting grid detail with a title block on textured off-white paper",
+        caption: "The title-block grid, drawn at full sheet scale before it became a template.",
+        aspect: "portrait",
       },
     ],
     featured: true,
@@ -108,7 +122,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Food & Beverage",
     location: "Seattle, WA",
     summary: "A typographic packaging system for a specialty roaster whose shelf presence had fallen behind its roasting.",
-    cover: "/images/emberline-cover.png",
+    cover: "/images/emberline-cover.webp",
+    coverAspect: "landscape",
     coverAlt: "Kraft paper coffee bags and cream boxes with minimal typographic labels and terracotta accents",
     services: ["Brand Identity", "Packaging & Print"],
     deliverables: ["Packaging system", "Label architecture", "Merch line", "Café collateral"],
@@ -124,14 +139,16 @@ export const PROJECTS: readonly Project[] = [
       "Emberline's wholesale accounts doubled in the eighteen months after relaunch, and the numbered seam became a collector's detail among subscribers. The seasonal terracotta program now sells through cafés faster than the roastery can print it.",
     details: [
       {
-        src: "/images/detail-typography.png",
+        src: "/images/detail-typography.webp",
         alt: "Macro photograph of large letterpress type blocks arranged in a wooden tray",
         caption: "The label type specimen — set, proofed, and rejected twice before the final cut.",
+        aspect: "wide",
       },
       {
-        src: "/images/detail-palette.png",
-        alt: "Hand-painted color palette study cards in warm neutral tones",
-        caption: "Kraft, cream, and terracotta — the palette matched to actual bag stocks before design began.",
+        src: "/images/detail-emberline-portrait.webp",
+        alt: "Kraft coffee bag and cream box with minimal typographic labels and a terracotta accent",
+        caption: "Bag and box at retail scale — one single-origin, one blend, one grid.",
+        aspect: "portrait",
       },
     ],
     featured: true,
@@ -144,7 +161,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Health & Wellness",
     location: "Remote / Austin, TX",
     summary: "A calm, accessible digital brand system for a mental-wellbeing platform scaling past two million sessions.",
-    cover: "/images/solace-cover.png",
+    cover: "/images/solace-portrait.webp",
+    coverAspect: "portrait",
     coverAlt: "Minimal calm interface on a tablet resting on cream linen beside dried eucalyptus",
     services: ["Visual Design System", "Brand Guidelines"],
     deliverables: ["Token architecture", "Component library spec", "Accessibility standards", "Brand guidelines"],
@@ -160,14 +178,16 @@ export const PROJECTS: readonly Project[] = [
       "Post-launch, Solace's support tickets mentioning visual confusion dropped by half, and session-completion rates in the redesigned flows rose measurably. The low-sensory mode, built directly on the token system, has become the platform's most-praised accessibility feature.",
     details: [
       {
-        src: "/images/detail-palette.png",
+        src: "/images/detail-palette.webp",
         alt: "Hand-painted color palette study cards in warm neutral tones",
         caption: "The calm register — painted, tested for contrast, then hardened into semantic tokens.",
+        aspect: "wide",
       },
       {
-        src: "/images/detail-pattern.png",
-        alt: "Minimal geometric brand pattern of fine lines with subtle accents on textured cream paper",
-        caption: "A fine-line texture used at 4% opacity — the system's only permitted decoration.",
+        src: "/images/detail-solace-portrait.webp",
+        alt: "Tablet showing a calm neutral interface beside a ceramic cup and folded linen",
+        caption: "The interface at rest — neutral tokens, generous space, nothing competing.",
+        aspect: "portrait",
       },
     ],
     featured: true,
@@ -180,7 +200,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Publishing",
     location: "New York, NY",
     summary: "Quarterly art direction for an independent journal of place, landscape, and slow travel.",
-    cover: "/images/meridian-cover.png",
+    cover: "/images/meridian-cover.webp",
+    coverAspect: "landscape",
     coverAlt: "Open editorial magazine spread with elegant serif typography and generous white space",
     services: ["Art Direction"],
     deliverables: ["Editorial design language", "Photography direction", "Four seasonal issues", "Cover system"],
@@ -196,14 +217,16 @@ export const PROJECTS: readonly Project[] = [
       "The redesigned issues sold through their print runs for the first time in the journal's history, and the cover system was shortlisted for a stack award. Two of the four issues have since been added to university design-periodical collections.",
     details: [
       {
-        src: "/images/detail-typography.png",
+        src: "/images/detail-typography.webp",
         alt: "Macro photograph of large letterpress type blocks arranged in a wooden tray",
         caption: "The journal's display face, proofed in letterpress to check its behavior at caption sizes.",
+        aspect: "wide",
       },
       {
-        src: "/images/workspace.png",
+        src: "/images/workspace.webp",
         alt: "Minimal designer studio desk with typography sketches and printed type specimens",
         caption: "Issue layout studies — grids sketched, then argued over, before any page was set.",
+        aspect: "landscape",
       },
     ],
     featured: false,
@@ -216,7 +239,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Creative Services",
     location: "Brooklyn, NY",
     summary: "A stationery-led identity for a creative collective that pitches as one studio and works as eleven.",
-    cover: "/images/foundry-cover.png",
+    cover: "/images/foundry-portrait.webp",
+    coverAspect: "portrait",
     coverAlt: "Stacked black and cream business cards with a debossed geometric mark and copper foil edges",
     services: ["Brand Identity", "Packaging & Print"],
     deliverables: ["Identity system", "Stationery system", "Pitch materials", "Onboarding kit"],
@@ -232,14 +256,16 @@ export const PROJECTS: readonly Project[] = [
       "The collective's pitch win rate rose in the year after launch — members credit materials that present eleven people as one confident studio. The member-card ritual has become a small onboarding ceremony, and no one has broken the system yet.",
     details: [
       {
-        src: "/images/detail-monogram.png",
+        src: "/images/detail-monogram.webp",
         alt: "Blind-deboss monogram pressed into thick cotton paper under raking light",
         caption: "The collective mark, blind-debossed — present in the light, invisible to the touch.",
+        aspect: "wide",
       },
       {
-        src: "/images/detail-pattern.png",
+        src: "/images/detail-pattern.webp",
         alt: "Minimal geometric brand pattern of fine black lines with rust accents",
         caption: "The geometric mark, exploded into a pattern for the pitch template's closing pages.",
+        aspect: "landscape",
       },
     ],
     featured: false,
@@ -252,7 +278,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Publishing",
     location: "Boston, MA",
     summary: "A spine-first cover system for an independent publisher whose books live or die on the shelf.",
-    cover: "/images/haven-cover.png",
+    cover: "/images/haven-cover.webp",
+    coverAspect: "landscape",
     coverAlt: "Stack of published books with minimalist typographic covers in cream, charcoal, and rust",
     services: ["Art Direction", "Packaging & Print"],
     deliverables: ["Cover system", "Spine architecture", "Seasonal catalog", "Sales collateral"],
@@ -268,14 +295,16 @@ export const PROJECTS: readonly Project[] = [
       "Haven's list began appearing in booksellers' staff-pick tables at a rate the publisher calls 'unprecedented for our size,' and the spine system survived its first two seasons without a single exception requested by an author.",
     details: [
       {
-        src: "/images/detail-typography.png",
+        src: "/images/detail-typography.webp",
         alt: "Macro photograph of large letterpress type blocks in a wooden tray",
         caption: "Spine type at shelf scale — proofed at size before the first title was set.",
+        aspect: "wide",
       },
       {
-        src: "/images/detail-palette.png",
+        src: "/images/detail-palette.webp",
         alt: "Hand-painted color study cards in cream, charcoal, and rust",
         caption: "The three-ink palette, held to across the whole list so covers rhyme on the shelf.",
+        aspect: "landscape",
       },
     ],
     featured: false,
@@ -288,7 +317,8 @@ export const PROJECTS: readonly Project[] = [
     sector: "Arts & Culture",
     location: "Santa Fe, NM",
     summary: "An environmental identity for a contemporary gallery expanding into a second, larger space.",
-    cover: "/images/latitude-cover.png",
+    cover: "/images/latitude-portrait.webp",
+    coverAspect: "portrait",
     coverAlt: "Large sans-serif gallery signage letters mounted on a warm concrete wall with architectural shadows",
     services: ["Brand Identity", "Packaging & Print"],
     deliverables: ["Identity system", "Environmental graphics", "Exhibition kit", "Announcement series"],
@@ -304,14 +334,16 @@ export const PROJECTS: readonly Project[] = [
       "The opening season at the warehouse drew record attendance, and the announcement series — nearly a meter tall — became briefly famous for being spotted folded into collectors' carry bags at fairs. The gallery has since extended the system to its residency program.",
     details: [
       {
-        src: "/images/detail-pattern.png",
+        src: "/images/detail-pattern.webp",
         alt: "Minimal geometric pattern of fine lines with warm accents on textured paper",
         caption: "The exhibition kit's frame — the only fixed element each designer inherits.",
+        aspect: "wide",
       },
       {
-        src: "/images/workspace.png",
+        src: "/images/workspace.webp",
         alt: "Minimal studio desk with brand collateral and type specimens in warm tones",
         caption: "Signage maquettes at desk scale, before fabrication at wall scale.",
+        aspect: "landscape",
       },
     ],
     featured: false,
@@ -331,9 +363,13 @@ export function getNextProject(slug: string): Project {
   return next;
 }
 
-/** Builds the 24-item marquee sequence: covers, detail imagery, and typographic tiles. */
+/** Builds the 24-item marquee sequence: covers, detail imagery, and typographic tiles.
+ *
+ * Image items carry a `shape` (tall / wide / landscape) so the strip renders as a
+ * mixed-aspect gallery — portrait covers stand tall, landscape covers run wide,
+ * studio details sit between, and the typographic tiles square off the rhythm. */
 export function getMarqueeItems(): ReadonlyArray<
-  | { kind: "image"; src: string; alt: string; label: string }
+  | { kind: "image"; src: string; alt: string; label: string; shape: "tall" | "wide" | "landscape" }
   | { kind: "tile"; label: string; sub: string }
 > {
   const imageItems = PROJECTS.map((p) => ({
@@ -341,15 +377,16 @@ export function getMarqueeItems(): ReadonlyArray<
     src: p.cover,
     alt: p.coverAlt,
     label: p.title,
+    shape: p.coverAspect === "portrait" ? ("tall" as const) : ("wide" as const),
   }));
 
   const detailItems = [
-    { src: "/images/detail-typography.png", alt: "Letterpress type blocks in a wooden tray", label: "Type studies" },
-    { src: "/images/detail-palette.png", alt: "Hand-painted palette study cards", label: "Palette studies" },
-    { src: "/images/detail-pattern.png", alt: "Fine-line geometric brand pattern", label: "Pattern system" },
-    { src: "/images/detail-monogram.png", alt: "Debossed monogram on cotton paper", label: "Monogram detail" },
-    { src: "/images/workspace.png", alt: "Studio desk with printed type specimens", label: "The studio desk" },
-  ].map((d) => ({ kind: "image" as const, ...d }));
+    { src: "/images/detail-typography.webp", alt: "Letterpress type blocks in a wooden tray", label: "Type studies" },
+    { src: "/images/detail-palette.webp", alt: "Hand-painted palette study cards", label: "Palette studies" },
+    { src: "/images/detail-pattern.webp", alt: "Fine-line geometric brand pattern", label: "Pattern system" },
+    { src: "/images/detail-monogram.webp", alt: "Debossed monogram on cotton paper", label: "Monogram detail" },
+    { src: "/images/workspace.webp", alt: "Studio desk with printed type specimens", label: "The studio desk" },
+  ].map((d) => ({ kind: "image" as const, shape: "landscape" as const, ...d }));
 
   const tileItems = [
     { label: "Identity", sub: "01" },

@@ -7,6 +7,19 @@ import { Reveal } from "@/components/reveal";
 import { ArrowLink, Container, SectionLabel } from "@/components/ui";
 import { getNextProject, getProject, PROJECTS } from "@/data/projects";
 
+/** Cover render classes per project aspect — the case hero follows the cover's rhythm. */
+const COVER_ASPECT_CLASS = {
+  landscape: "aspect-[8/5]",
+  portrait: "aspect-[3/4]",
+} as const;
+
+/** Detail render classes per detail aspect — wide banners, landscape, portrait studies. */
+const DETAIL_ASPECT_CLASS = {
+  wide: "aspect-[7/3]",
+  landscape: "aspect-[3/2]",
+  portrait: "aspect-[3/4]",
+} as const;
+
 type PageProps = { params: Promise<{ slug: string }> };
 
 export function generateStaticParams() {
@@ -24,7 +37,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title: `${project.title} — case study`,
       description: project.summary,
-      images: [{ url: project.cover, width: 1344, height: 768, alt: project.coverAlt }],
+      images: [
+        {
+          url: project.cover,
+          width: project.coverAspect === "portrait" ? 864 : 1344,
+          height: project.coverAspect === "portrait" ? 1152 : 840,
+          alt: project.coverAlt,
+        },
+      ],
     },
   };
 }
@@ -66,10 +86,10 @@ export default async function ProjectPage({ params }: PageProps) {
           <Image
             src={project.cover}
             alt={project.coverAlt}
-            width={1344}
-            height={768}
+            width={project.coverAspect === "portrait" ? 864 : 1344}
+            height={project.coverAspect === "portrait" ? 1152 : 840}
             priority
-            className="aspect-[3/2] w-full object-cover"
+            className={`${COVER_ASPECT_CLASS[project.coverAspect]} w-full object-cover`}
           />
         </Reveal>
       </Container>
@@ -109,7 +129,7 @@ export default async function ProjectPage({ params }: PageProps) {
             </div>
           </Reveal>
 
-          {/* Detail imagery */}
+          {/* Detail imagery — mixed aspects: wide banner, landscape, portrait */}
           <div className="mt-16 grid gap-8 sm:grid-cols-2">
             {project.details.map((detail, index) => (
               <Reveal key={detail.src + index} variant="card" delay={index * 60}>
@@ -117,9 +137,15 @@ export default async function ProjectPage({ params }: PageProps) {
                   <Image
                     src={detail.src}
                     alt={detail.alt}
-                    width={1344}
-                    height={768}
-                    className="aspect-[3/2] w-full object-cover"
+                    width={detail.aspect === "portrait" ? 864 : 1344}
+                    height={
+                      detail.aspect === "portrait"
+                        ? 1152
+                        : detail.aspect === "wide"
+                          ? 576
+                          : 896
+                    }
+                    className={`${DETAIL_ASPECT_CLASS[detail.aspect]} w-full object-cover`}
                   />
                   <figcaption className="mt-3 text-xs leading-relaxed text-muted-foreground">
                     {detail.caption}

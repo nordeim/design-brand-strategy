@@ -2,27 +2,17 @@
 
 import { useState, type FormEvent } from "react";
 
-import { BUDGET_RANGES, PROJECT_TYPES, contactSchema, fieldErrors } from "@/lib/contact";
+import { SITE } from "@/data/site";
+import {
+  BUDGET_LABELS,
+  BUDGET_RANGES,
+  contactSchema,
+  fieldErrors,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPES,
+} from "@/lib/contact";
 
 type Status = "idle" | "submitting" | "success" | "error";
-
-const PROJECT_TYPE_LABELS: Record<(typeof PROJECT_TYPES)[number], string> = {
-  "brand-identity": "Brand Identity",
-  "visual-design-system": "Visual Design System",
-  "art-direction": "Art Direction",
-  "brand-guidelines": "Brand Guidelines",
-  "naming-verbal-identity": "Naming & Verbal Identity",
-  "packaging-print": "Packaging & Print",
-  other: "Something else",
-};
-
-const BUDGET_LABELS: Record<(typeof BUDGET_RANGES)[number], string> = {
-  "under-25k": "Under $25k",
-  "25-50k": "$25k – $50k",
-  "50-100k": "$50k – $100k",
-  "100k-plus": "$100k+",
-  "not-sure": "Not sure yet",
-};
 
 const FIELD_CLASS =
   "w-full border-b border-border bg-transparent py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground";
@@ -88,12 +78,12 @@ export function ContactForm() {
           setServerMessage("Some details need a second look — please check the highlighted fields.");
         }
       } else {
-        setServerMessage("Something went wrong on my end. Please email studio@elenavance.com directly.");
+        setServerMessage(`Something went wrong on my end. Please email ${SITE.email} directly.`);
       }
       setStatus("error");
     } catch {
       setStatus("error");
-      setServerMessage("The network dropped the message. Please try again, or email studio@elenavance.com directly.");
+      setServerMessage(`The network dropped the message. Please try again, or email ${SITE.email} directly.`);
     }
   }
 
@@ -185,7 +175,15 @@ export function ContactForm() {
           <label htmlFor="projectType" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
             Project type <span aria-hidden="true">*</span>
           </label>
-          <select id="projectType" name="projectType" required defaultValue="" className={FIELD_CLASS}>
+          <select
+            id="projectType"
+            name="projectType"
+            required
+            defaultValue=""
+            aria-describedby={errors.projectType ? "projectType-error" : undefined}
+            aria-invalid={Boolean(errors.projectType)}
+            className={FIELD_CLASS}
+          >
             <option value="" disabled>
               Choose a type
             </option>
@@ -195,14 +193,26 @@ export function ContactForm() {
               </option>
             ))}
           </select>
-          {errors.projectType ? <p className="mt-2 text-xs">{errors.projectType}</p> : null}
+          {errors.projectType ? (
+            <p id="projectType-error" className="mt-2 text-xs">
+              {errors.projectType}
+            </p>
+          ) : null}
         </div>
 
         <div>
           <label htmlFor="budget" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
             Budget <span aria-hidden="true">*</span>
           </label>
-          <select id="budget" name="budget" required defaultValue="" className={FIELD_CLASS}>
+          <select
+            id="budget"
+            name="budget"
+            required
+            defaultValue=""
+            aria-describedby={errors.budget ? "budget-error" : undefined}
+            aria-invalid={Boolean(errors.budget)}
+            className={FIELD_CLASS}
+          >
             <option value="" disabled>
               Choose a range
             </option>
@@ -212,7 +222,11 @@ export function ContactForm() {
               </option>
             ))}
           </select>
-          {errors.budget ? <p className="mt-2 text-xs">{errors.budget}</p> : null}
+          {errors.budget ? (
+            <p id="budget-error" className="mt-2 text-xs">
+              {errors.budget}
+            </p>
+          ) : null}
         </div>
       </div>
 

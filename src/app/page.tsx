@@ -2,12 +2,20 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { CollageStrip } from "@/components/collage-strip";
+import { CtaBand } from "@/components/cta-band";
 import { Marquee } from "@/components/marquee";
 import { ProjectCard } from "@/components/project-card";
 import { Reveal } from "@/components/reveal";
 import { ArrowLink, Container, SectionLabel } from "@/components/ui";
 import { APPROACH_PRINCIPLES, SITE, SERVICES } from "@/data/site";
 import { FEATURED_PROJECTS } from "@/data/projects";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  openGraph: {
+    images: [{ url: "/images/workspace.webp", width: 1344, height: 768, alt: "The studio table" }],
+  },
+};
 
 export default function HomePage() {
   return (
@@ -47,7 +55,7 @@ export default function HomePage() {
               <div className="relative">
                 <div className="overflow-hidden">
                   <Image
-                    src="/images/portrait-main.png"
+                    src="/images/portrait-main.webp"
                     alt="Studio portrait of Elena Vance against a warm cream backdrop"
                     width={768}
                     height={1344}
@@ -101,7 +109,7 @@ export default function HomePage() {
           <div className="md:col-span-5">
             <Reveal variant="card">
               <Image
-                src="/images/portrait-about.png"
+                src="/images/portrait-about.webp"
                 alt="Elena Vance working at a wooden studio desk with typography sketches"
                 width={864}
                 height={1152}
@@ -174,31 +182,19 @@ export default function HomePage() {
       </Container>
 
       {/* ------------------------------------------------------------------
-        Closing CTA — inverted band.
+        Closing CTA — light muted band with the ink pill action.
       ------------------------------------------------------------------ */}
-      <section className="bg-foreground py-20 text-background md:py-28">
-        <Container>
-          <Reveal>
-            <p className="text-xs font-medium uppercase tracking-[0.22em] opacity-70">
-              {SITE.availability}
-            </p>
-            <h2 className="mt-6 max-w-[16ch] font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[1.05] tracking-tight">
-              Let&apos;s build something <em className="italic">considered</em>.
-            </h2>
-            <p className="mt-6 max-w-[48ch] text-sm leading-relaxed opacity-70">
-              The best projects start with a conversation about the business, not the deliverables.
-              Tell me where you&apos;re headed — I&apos;ll tell you honestly whether I&apos;m the
-              right designer for it.
-            </p>
-            <Link
-              href="/contact"
-              className="mt-10 inline-flex items-center gap-2 rounded-full bg-background px-7 py-3.5 text-sm font-medium uppercase tracking-[0.14em] text-foreground transition-opacity duration-300 hover:opacity-80"
-            >
-              Start a conversation
-            </Link>
-          </Reveal>
-        </Container>
-      </section>
+      <CtaBand
+        label={SITE.availability}
+        title={
+          <>
+            Let&apos;s build something <em className="italic">considered</em>.
+          </>
+        }
+        body="The best projects start with a conversation about the business, not the deliverables. Tell me where you're headed — I'll tell you honestly whether I'm the right designer for it."
+        href="/contact"
+        linkText="Start a conversation"
+      />
     </>
   );
 }

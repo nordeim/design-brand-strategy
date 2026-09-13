@@ -3,7 +3,7 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NAV_LINKS, SITE } from "@/data/site";
@@ -11,6 +11,8 @@ import { NAV_LINKS, SITE } from "@/data/site";
 export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Lock body scroll while the mobile menu is open.
   useEffect(() => {
@@ -18,6 +20,13 @@ export function SiteHeader() {
     return () => {
       document.body.style.overflow = "";
     };
+  }, [open]);
+
+  // Keyboard flow: focus enters the menu when it opens; Escape returns to the toggle.
+  useEffect(() => {
+    if (!open) return;
+    const first = menuRef.current?.querySelector<HTMLAnchorElement>("a[href]");
+    first?.focus();
   }, [open]);
 
   return (
@@ -57,8 +66,19 @@ export function SiteHeader() {
         <div className="flex items-center gap-3 md:hidden">
           <ThemeToggle />
           <button
+            ref={toggleRef}
             type="button"
-            onClick={() => setOpen((v) => !v)}
+            onClick={() => {
+              const next = !open;
+              setOpen(next);
+              if (!next) toggleRef.current?.focus();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && open) {
+                setOpen(false);
+                toggleRef.current?.focus();
+              }
+            }}
             aria-expanded={open}
             aria-controls="mobile-menu"
             aria-label={open ? "Close menu" : "Open menu"}
@@ -71,8 +91,15 @@ export function SiteHeader() {
 
       {open ? (
         <nav
+          ref={menuRef}
           id="mobile-menu"
           aria-label="Primary mobile"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpen(false);
+              toggleRef.current?.focus();
+            }
+          }}
           className="flex h-[calc(100dvh-5rem)] flex-col justify-between border-t border-border bg-background px-6 pb-10 pt-8 md:hidden"
         >
           <ul className="flex flex-col gap-2">

@@ -9,6 +9,16 @@ export const metadata: Metadata = {
   title: "Work",
   description:
     "Selected identity systems, design systems, art direction, and packaging engagements — 2022 to today.",
+  openGraph: {
+    images: [
+      {
+        url: "/images/alder-pine-cover.webp",
+        width: 1344,
+        height: 840,
+        alt: "Letterpress stationery for Alder & Pine",
+      },
+    ],
+  },
 };
 
 export default function WorkPage() {

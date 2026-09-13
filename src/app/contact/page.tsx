@@ -10,6 +10,16 @@ export const metadata: Metadata = {
   title: "Contact",
   description:
     "Start a project with Elena Vance — estimate your investment in four steps, then tell me about the work.",
+  openGraph: {
+    images: [
+      {
+        url: "/images/detail-monogram.webp",
+        width: 1344,
+        height: 576,
+        alt: "Debossed monogram detail on cotton paper",
+      },
+    ],
+  },
 };
 
 type PageProps = {

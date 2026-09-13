@@ -3,6 +3,12 @@ import Link from "next/link";
 
 import type { Project } from "@/data/projects";
 
+/** Cover render classes per project aspect — the mixed editorial grid rhythm. */
+const COVER_ASPECT_CLASS = {
+  landscape: "aspect-[8/5]",
+  portrait: "aspect-[3/4]",
+} as const;
+
 /**
  * Project card — image-led with adjacent metadata. Hovering eases the cover
  * upward by a few pixels; the whole card is the link.
@@ -14,9 +20,9 @@ export function ProjectCard({ project, index }: { project: Project; index?: numb
         <Image
           src={project.cover}
           alt={project.coverAlt}
-          width={1344}
-          height={768}
-          className="aspect-[3/2] w-full object-cover transition-transform duration-700 ease-out group-hover:-translate-y-2"
+          width={project.coverAspect === "portrait" ? 864 : 1344}
+          height={project.coverAspect === "portrait" ? 1152 : 840}
+          className={`${COVER_ASPECT_CLASS[project.coverAspect]} w-full object-cover transition-transform duration-700 ease-out group-hover:-translate-y-2`}
         />
       </div>
       <div className="mt-5 flex items-baseline justify-between gap-6">

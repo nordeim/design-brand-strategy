@@ -16,6 +16,8 @@ export const SITE = {
   description:
     "Elena Vance is an independent designer and brand strategist in New York, building considered identities, design systems, and art direction for ambitious companies and cultural institutions.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  /** Content revision date — the deterministic stamp used by the sitemap. */
+  contentUpdatedAt: "2026-09-13",
 } as const;
 
 export const NAV_LINKS = [
@@ -238,3 +240,67 @@ export const SCOPES: ReadonlyArray<{ id: string; label: string; multiplier: numb
   { id: "comprehensive", label: "Comprehensive", multiplier: 1 },
   { id: "full-system", label: "Full System", multiplier: 1.3 },
 ];
+
+/* ---------------------------------------------------------------------------
+ * Engagement process — the "How we work together" section on /services.
+ * ------------------------------------------------------------------------ */
+
+export const PROCESS_STEPS = [
+  {
+    number: "01",
+    title: "Discover",
+    body: "Every engagement opens with the people who know the business best — founders, operators, customers. Two weeks of structured interviews, positioning groundwork, and honest questions produce the material everything else is made from. Nothing is designed yet, and that is the point: the strongest identities are uncovered, not imposed.",
+  },
+  {
+    number: "02",
+    title: "Define",
+    body: "Strategy before styling. We fix the positioning, the audience, and the decisions the identity must carry, then translate them into a creative brief with named territories. This is where scope, timing, and investment are agreed in writing — the discipline that keeps the design phase fast and the surprises out of it.",
+  },
+  {
+    number: "03",
+    title: "Design",
+    body: "Identity and system work happens in structured rounds — territories first, then the chosen direction developed across real applications rather than presentation theater. You see the brand where it will actually live: the packaging line, the product surface, the tradeshow wall, the twelfth slide of the sales deck.",
+  },
+  {
+    number: "04",
+    title: "Deliver",
+    body: "Launch is a beginning, not a handoff. Every engagement ships with the asset library, the guidelines written for the people who use them, and a stewardship window while the system meets the real world. The measure of the work is the tenth application made without me in the room.",
+  },
+] as const;
+
+/* ---------------------------------------------------------------------------
+ * Common questions — the FAQ section on /services.
+ * ------------------------------------------------------------------------ */
+
+export const FAQ_ITEMS = [
+  {
+    question: "What does an engagement typically cost?",
+    answer:
+      "The four core practices carry honest starting ranges — Brand Identity $30k–$50k, Visual Design Systems $25k–$45k, Art Direction $15k–$30k, and Brand Guidelines $10k–$25k — adjusted by company stage, timeline, and scope. The estimator on the contact page shows how those multipliers combine. Final investment is set together after a scoping call, in writing, before any work begins.",
+  },
+  {
+    question: "How long does a project take?",
+    answer:
+      "A full identity runs ten to fourteen weeks; systems and guidelines engagements run six to ten. Accelerated timelines are possible and priced honestly for what they demand — a rush compresses decision cycles, not craft. The schedule with named milestones is part of the written proposal, so timing is a commitment rather than a hope.",
+  },
+  {
+    question: "Do you work with early-stage companies?",
+    answer:
+      "Yes — roughly a third of the practice is ventures under two years old. The estimator carries a startup adjustment because early work carries different decisions: what to fix now, what to leave loose, and how to build an identity that survives the next two rounds of what the company becomes. Positioning discipline matters most when there is the least history to lean on.",
+  },
+  {
+    question: "Who owns the work when it's done?",
+    answer:
+      "You do, completely. Full IP transfers on final payment — source files, fonts licensing where applicable, and the asset library included. The only thing I retain is the right to show the work. Deliverables and ownership terms are itemized in the proposal before the engagement begins, not discovered at the end.",
+  },
+  {
+    question: "Do you work with in-house teams?",
+    answer:
+      "Often, and gladly. Systems engagements are built for in-house designers and engineers — tokens, components, and governance they can extend without permission slips. Art direction retainers exist precisely for teams that want a senior external eye on a cadence. The system is designed to survive my absence, and that is a feature, not a risk.",
+  },
+  {
+    question: "What does a project actually start with?",
+    answer:
+      "A 30-minute scoping call about the business — where it is headed, what decision is in front of it, and whether I am honestly the right designer for that. If the fit is right, you receive a written proposal with scope, timing, investment, and deliverables within a week. No surprises later is a design principle here, not a slogan.",
+  },
+] as const;

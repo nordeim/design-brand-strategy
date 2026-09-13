@@ -14,6 +14,8 @@ import { estimateRange, formatCompactUsd, formatRange, type EstimatorSelection }
 
 type StepKey = keyof EstimatorSelection;
 
+type EstimatorOption = { id: string; label: string; baseLow?: number; baseHigh?: number };
+
 const STEPS: ReadonlyArray<{
   key: StepKey;
   label: string;
@@ -24,6 +26,14 @@ const STEPS: ReadonlyArray<{
   { key: "timelineId", label: "Timeline", question: "How should the work be paced?" },
   { key: "scopeId", label: "Scope", question: "How far should the system go?" },
 ];
+
+/** Options for every step, keyed by step — one render path, no copy-paste drift. */
+const OPTION_SETS: Record<StepKey, ReadonlyArray<EstimatorOption>> = {
+  serviceId: ESTIMATOR_SERVICES,
+  stageId: COMPANY_STAGES,
+  timelineId: TIMELINES,
+  scopeId: SCOPES,
+};
 
 /**
  * Four-step investment estimator. Selecting an option records the choice and
@@ -48,6 +58,8 @@ export function Estimator({ initialServiceId }: { initialServiceId?: EstimatorSe
 
   const active = STEPS[step]!;
   const done = step === STEPS.length - 1;
+  const options = OPTION_SETS[active.key];
+  const showPrice = active.key === "serviceId";
 
   return (
     <div className="border border-border">
@@ -89,96 +101,32 @@ export function Estimator({ initialServiceId }: { initialServiceId?: EstimatorSe
         </p>
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={active.question}>
-          {active.key === "serviceId"
-            ? ESTIMATOR_SERVICES.map((option) => {
-                const selected = selection.serviceId === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => choose("serviceId", option.id)}
-                    className={`flex items-baseline justify-between gap-4 border px-5 py-4 text-left transition-colors duration-200 ${
-                      selected
-                        ? "border-foreground bg-muted"
-                        : "border-border hover:border-foreground/40"
-                    }`}
-                  >
-                    <span className="text-sm font-medium">{option.label}</span>
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {formatCompactUsd(option.baseLow)}–{formatCompactUsd(option.baseHigh)}
-                    </span>
-                  </button>
-                );
-              })
-            : null}
-
-          {active.key === "stageId"
-            ? COMPANY_STAGES.map((option) => {
-                const selected = selection.stageId === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => choose("stageId", option.id)}
-                    className={`border px-5 py-4 text-left text-sm font-medium transition-colors duration-200 ${
-                      selected
-                        ? "border-foreground bg-muted"
-                        : "border-border hover:border-foreground/40"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })
-            : null}
-
-          {active.key === "timelineId"
-            ? TIMELINES.map((option) => {
-                const selected = selection.timelineId === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => choose("timelineId", option.id)}
-                    className={`border px-5 py-4 text-left text-sm font-medium transition-colors duration-200 ${
-                      selected
-                        ? "border-foreground bg-muted"
-                        : "border-border hover:border-foreground/40"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })
-            : null}
-
-          {active.key === "scopeId"
-            ? SCOPES.map((option) => {
-                const selected = selection.scopeId === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => choose("scopeId", option.id)}
-                    className={`border px-5 py-4 text-left text-sm font-medium transition-colors duration-200 ${
-                      selected
-                        ? "border-foreground bg-muted"
-                        : "border-border hover:border-foreground/40"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })
-            : null}
+          {options.map((option) => {
+            const selected = selection[active.key] === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => choose(active.key, option.id)}
+                className={`flex text-left transition-colors duration-200 ${
+                  showPrice ? "items-baseline justify-between gap-4" : ""
+                } border px-5 py-4 ${
+                  selected
+                    ? "border-foreground bg-muted"
+                    : "border-border hover:border-foreground/40"
+                }`}
+              >
+                <span className="text-sm font-medium">{option.label}</span>
+                {typeof option.baseLow === "number" && typeof option.baseHigh === "number" ? (
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {formatCompactUsd(option.baseLow)}–{formatCompactUsd(option.baseHigh)}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
 
         {step > 0 ? (
