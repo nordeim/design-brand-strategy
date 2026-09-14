@@ -38,8 +38,6 @@
   ],
   "exclude": [
     "node_modules",
-    "skills",
-    "scripts",
-    "e2e"
+    "skills"
   ]
 }
