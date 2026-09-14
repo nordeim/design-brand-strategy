@@ -47,5 +47,9 @@
   },
   "trustedDependencies": [
     "unrs-resolver"
-  ]
+  ],
+  "allowScripts": {
+    "prisma": true,
+    "@prisma/client": true
+  }
 }
