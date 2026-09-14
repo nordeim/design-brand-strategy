@@ -326,3 +326,91 @@ Driven by `docs/AUDIT_CODE_REVIEW.md` § Pass 3 (tiered review + security audit)
 | R2-4 (AUD-4/5/6) | — | Documented-accepted (honeypot client-side by design; history residue synthetic-only; oversized-body parse-then-reject bounded by the fixed limiter) | Audit table |
 
 **Final gate after the second cycle:** lint ✅ · typecheck (e2e+scripts) ✅ · 62/62 unit ✅ · build 20 routes ✅ · 83/83 e2e ✅ · CLS harness 0.0000 ✅.
+
+---
+
+# Pass 4 — Remediation Plan: Live-Deploy E2E Environment Awareness (2026-09-14)
+
+**Date:** 2026-09-14 (fourth session)
+**Inputs:** Pass-4 live-site E2E run (chromium 76/78 + mobile 5/5 against `https://design-brand-strategy.jesspete.shop`), VLM + DOM parity re-audit vs the source site, live deploy-state probes.
+**Method:** TDD per `skills/tdd` / `skills/test-driven-development` (RED → GREEN per slice; the failing live-run IS the RED evidence for P4-F1). Planned per `skills/planning-and-task-breakdown`.
+**Branch policy:** all work on `main` (operator contract — no new branches). Conventional Commits, atomic slices.
+
+## 1. Findings (from the live-deploy E2E + parity validation)
+
+| ID | Sev | Finding | Evidence |
+|---|---|---|---|
+| P4-F1 | **High (test-suite)** | The two rate-limit isolation specs (`burst over the limit trips 429`, `client keys are isolated`) fail whenever the suite runs against an edge-proxied external server (`E2E_BASE_URL` = the live Cloudflare deploy). AUD-1's correct trust order keys every request by the unforgeable `cf-connecting-ip`, so per-test spoofed `x-forwarded-for` values no longer isolate buckets — one machine = one bucket shared across all specs. The documented `E2E_BASE_URL` use case ("reuse an external server, e.g. the live deploy") is therefore broken for exactly these two specs, and a doc claim ("tests spoof unique `x-forwarded-for` values to stay isolated") is now origin-dependent. | Live run: `contact.spec.ts:74` expected `[202,202,202,202,202,429]`, got early 429 (earlier specs in the same file had already consumed the shared bucket — rate limiting runs BEFORE validation, so 400s also count); `contact.spec.ts:99` fresh-XFF request returned 429. Local run (self-managed `next start`, no edge): 83/83. |
+| P4-F2 | Medium (deploy tooling) | The operator-facing "suggested next steps" from pass 3 (verify email-obfuscation OFF, security headers, hard-404, cold-load CLS on the live deploy) exist only as prose. Measured now: **Cloudflare Email Address Obfuscation is STILL ON** — the live `/contact` HTML contains two `/cdn-cgi/l/email-protection` rewrites (studio email in the contact rail + footer), exactly the hydration-mismatch + `[email protected]`-flash risk README § Deployment warns about. There is no repeatable script that turns these deploy-state checks into a gate. | `curl -s …/contact | rg -c "cdn-cgi/l/email-protection"` → 2; README "Cloudflare-fronted deploys" bullet. |
+| P4-F3 | Low (docs) | `robots.txt` on the live deploy is prepended with Cloudflare Managed Content (content-signals preamble + AI-bot blocks); the app's own directives (Allow /, Disallow /api/, Sitemap pointer) remain intact below it. Undocumented in the deployment notes; operators seeing the padded file need to know it is expected CF behavior, not an app bug. | `curl -s …/robots.txt` — `# BEGIN Cloudflare Managed content` … `# END Cloudflare Managed Content` then the app block. |
+| P4-F4 | Info (docs) | Pass-4 parity re-validation (VLM pairwise + DOM verification + geometry probes) is not yet recorded in `docs/AUDIT_VISUAL_PARITY.md` — the audit trail should show the post-pass-3-live-deploy state: HIGH fidelity, all VLM-flagged gaps DOM-refuted, aspect rhythms exact. | `tool-results/parity-pass4/` artifacts + this session's probes. |
+
+**Non-findings (verified clean, no action):** live cold-load CLS 0.0000 (×2); no console/page errors on any live page (no hydration mismatches manifesting despite the obfuscation rewrites — the decode script wins the race today, the risk remains); bogus-slug hard-404 live; full security-header set live; estimator four groups + gated estimate + timeline durations live; work-grid aspect rhythm byte-identical to source; marquee mixed shapes match; all VLM structural claims (theme toggle, sub-labels, approach grid, italic sub-heads, footer email, Challenge/Approach/Outcome sections) DOM-verified present.
+
+## 2. Design decisions
+
+### D1 — Environment-aware rate-limit isolation specs (P4-F1) — *design corrected by pre-execution validation*
+The specs must keep their full strength on self-managed origins (local `next start`, CI) and degrade **explicitly and loudly** (dynamic skip with a printed reason, never silently pass) when the target keys requests by an unforgeable edge header.
+
+**Validated design (corrections from the pre-execution check):** a dedicated beforeAll capability probe was rejected — it would consume the shared bucket BEFORE the earlier 202-expecting specs and break them on edge-fronted origins (and re-running the suite within the 10-min window would trip it). Playwright's `test.skip(condition, description)` inside a test body (validated on 1.63: skips with a visible reason; module-level flags persist across tests under `workers: 1`) is the right mechanism. Both specs become **self-diagnosing in situ**:
+
+- **Burst spec:** send the 6 same-XFF requests as today, then classify the status sequence with a pure helper `classifyBurstStatuses(statuses, limit)` in `src/lib/rate-limit.ts` — `"isolated"` (exactly `[202×5, 429]` → assert the full contract incl. Retry-After), `"shared"` (a 429 appears before the limit-th response, or all 429 → edge-fronted shared keying → dynamic skip with evidence), `"broken"` (no 429 at all → limiter regression → hard fail). Unit-testable RED-first seam, colocated with `clientKey` whose behavior it characterizes.
+- **Isolation spec:** burn the `burned-<ts>` bucket as today, then send the fresh-XFF request: `429` despite a never-before-seen XFF value is *proof* of shared keying → dynamic skip; `202` → the assertion passes as today. Any other status → the expect fails loudly (real regression).
+- **Valid-payload spec:** one robustness guard — on a `429` (bucket pre-burned by a prior run within the window on a shared-key origin), dynamic-skip with reason; local runs keep the exact `202` assertion. (Local/self-managed runs are the authoritative contract check; live runs validate deploy-state.)
+- Zero additional requests are introduced; the live suite becomes idempotent within the rate-limit window instead of flaky.
+
+### D2 — Repeatable live-deploy audit script (P4-F2)
+`scripts/live-deploy-audit.mjs` (node, zero deps beyond the repo): env `LIVE_URL` (default the production origin). Checks, each PASS/FAIL with evidence: (1) `/api/health` ok; (2) security-header contract incl. CSP directives (same set as `smoke.spec.ts`); (3) unknown `/work/<slug>` → 404; (4) `robots.txt` contains the app's `Sitemap:` pointer; (5) `/contact` HTML contains **no** `/cdn-cgi/l/email-protection` rewrites (email obfuscation OFF — the currently-failing deploy-state item); (6) cold-load CLS ≤ 0.1 (PerformanceObserver, 2 navigations). Exit 0 only if all pass; exit 1 with a remediation hint per failure (e.g. "Cloudflare dashboard → Scrape Shield → disable Email Address Obfuscation"). This is deploy-state tooling, deliberately **not** an e2e spec — the suite validates the code contract, the script validates the operator's dashboard.
+
+### D3 — Docs (P4-F3, P4-F4, and D1 fallout)
+README § Deployment: add the CF Managed `robots.txt` preamble note; point operators at `scripts/live-deploy-audit.mjs` as the post-deploy checklist. AGENTS.md e2e section + CLAUDE.md testing notes: qualify the XFF-isolation claim with the edge-proxy skip behavior. SKILL.md: § test-strategy claim + a Pass 4 change log + lesson (edge-fronted targets change rate-limit semantics for the suite). `docs/AUDIT_VISUAL_PARITY.md`: append the Pass 4 re-validation record.
+
+## 3. Validation against the codebase (pre-execution)
+
+1. `src/lib/rate-limit.ts` exports `clientKey`/`rateLimit`; adding a third pure export keeps the module contract single-purpose (keying + probing are one concern). `src/lib/rate-limit.test.ts` (10 tests) is the RED home for the new verdict tests.
+2. `e2e/contact.spec.ts` describe "contact API contract" — validated on Playwright 1.63 in this sandbox: `test.skip(condition, description)` called **inside the test body** performs a dynamic skip with a visible reason; module-level state persists across tests in one file under `workers: 1` (probe spec executed: set-flag → conditional-skip → pass). Declaration-time `test.skip(cond, …)` evaluates at collection (too early) — hence the in-body pattern. The `request` fixture is available per-test; the two specs already use it.
+3. Probe constant: the route pins `LIMIT = 5` server-side; the spec hard-codes the same 5/6 arithmetic today (its header comment says "5 requests per 10-minute window") — the probe mirrors that existing convention (no import of server constants into specs exists, and route internals are not exported).
+4. `scripts/` are typecheck-covered (tsconfig excludes only `node_modules` + `skills`); a `.mjs` script is fine (existing `cls-regression.mjs` precedent — not type-checked, node-run).
+5. The CLS measurement approach in D2 mirrors `scripts/cls-regression.mjs`'s PerformanceObserver pattern; against a remote origin no gap-proxy is needed (real network).
+6. Docs touched: `README.md` (Deployment), `AGENTS.md` (Playwright e2e suite section), `CLAUDE.md` (Testing Strategy), `design-brand-strategy_SKILL.md` (§ e2e + change log + lesson), `docs/AUDIT_VISUAL_PARITY.md` (append Pass 4). None of the changed claims are load-bearing for Tier-0 contract checks beyond adding the qualification.
+
+## 4. Execution order (TDD)
+
+1. **Slice A (P4-F1):** RED — unit tests for `classifyBurstStatuses` (fail: function absent). GREEN — implement in `src/lib/rate-limit.ts`. Then wire in-body dynamic skips into `e2e/contact.spec.ts` (burst: classify → skip/fail; isolation: fresh-XFF 429 → skip; valid: 429 → skip). Verify: local `bun run e2e` (all specs RUN and pass — no skips); live `E2E_BASE_URL=… e2e` (isolation-dependent specs SKIP with reasons, suite green); unit suite 62+new; re-run live within the 10-min window (idempotent — the valid spec skips instead of failing).
+2. **Slice B (P4-F2):** create `scripts/live-deploy-audit.mjs`; run against local prod server (expect all PASS incl. email check — no edge) and against live (expect exactly one FAIL: email obfuscation, with the dashboard remediation hint). 
+3. **Slice C (P4-F3/P4-F4 + D1 doc fallout):** README, AGENTS, CLAUDE, SKILL (v2.3.0 change log + new lesson L16), AUDIT_VISUAL_PARITY Pass 4 record.
+4. **Final gate:** lint → typecheck → test (expect 62+N) → build → e2e:all local (83/83) → e2e against live (all pass or explicitly-skipped) → `scripts/live-deploy-audit.mjs` against live (documents the one known open deploy-state item).
+
+## 5. Risks & mitigations
+
+- **Skip logic masking a REAL limiter regression on self-managed origins** — the probe itself is a limiter test (6 unique-XFF requests must stay 202 on an XFF-keyed origin; any 429 → shared → skip). A broken limiter that never 429s would make the burst spec's final assertions fail (they assert a 429 occurs), so the suite still catches limiter regressions on self-managed origins; on edge-fronted origins the limiter is not the app's contract anyway (the edge enforces per-IP identity).
+- **Probe requests pollute the live inquiry sink** — bounded (6), synthetic, consistent with the existing spec traffic; the live DB already carries 27+ synthetic rows from prior validation runs.
+- **CLS probe flakiness on a remote origin** — two navigations, both must be ≤ 0.1; warm-cache effects skew low, cold-load skew is the actual risk being measured.
+
+---
+
+# Pass 4 — Second Remediation Cycle: Plan & Execution Record (2026-09-14)
+
+Driven by `docs/AUDIT_CODE_REVIEW.md` § Pass 4 (tiered review + security audit — verdict: safe to ship; backlog documentation-only). Method per `skills/tdd` where code changes exist (R4-1/R4-2 are doc contracts; the RED evidence is the audit's T0 drift table itself).
+
+## Scope
+
+| Item | Action | RED evidence (audit) |
+|---|---|---|
+| R4-1 | PAD realignment: 62→71 tests (§ testing summary + anywhere the count appears); ADR-009 rationale gains the P4-F1 edge-fronted qualification (spoofed-XFF isolation holds on self-managed origins; edge-fronted external runs self-diagnose and skip loudly); testing-tooling inventory gains `classifyBurstStatuses` (with its unit-test home) and `scripts/live-deploy-audit.mjs` | T0-1/T0-2/T0-3 |
+| R4-2 | SKILL.md §11 pre-ship checklist gains the post-deploy step (run `scripts/live-deploy-audit.mjs` against the live origin after every deploy/dashboard change); Appendix C cross-references the script as the codified live-validation harness | Audit backlog #2 |
+| R4-3 | **Deferred with rationale** (not executed): dead-page guard in the audit script's CLS check — checks 1–5 already gate origin liveness, so a dead page cannot reach a green CLS verdict in practice; revisit only if the script grows standalone use | Audit nit |
+
+## Validation against the codebase (pre-execution)
+
+1. PAD drift lines located by direct read: the "62 tests" claim (~line 493), the ADR-009 rationale (~line 135), and the tooling inventory (§12/§14 region). No other stale counts (`rg "62"` in PAD shows exactly one test-count hit).
+2. SKILL §11's gate block already lists lint/typecheck/test/build/e2e/cls-regression — appending the post-deploy audit step is additive, non-contradictory. Appendix C (post-deploy live-site validation) is the natural home for the cross-reference; it currently describes manual probing only.
+3. No code files change in this cycle → no TDD seams; the verification gate is the full mechanical suite (unchanged expectations: 71/71, 83/83) plus a `rg` re-check that the stale claims are gone (GREEN condition for the doc contract).
+
+## Execution record
+
+| Step | Change | Verification |
+|---|---|---|
+| R4-1 | PAD: test count 62→71 with the classifier named; ADR-009 rationale qualified (self-managed vs edge-fronted origins, `classifyBurstStatuses`, loud skips); tooling inventory adds the deploy-audit script | `rg "62 tests" Project_Architecture_Document.md` → no hits; new claims match `package.json`/`src/lib/rate-limit.ts`/`scripts/` reality |
+| R4-2 | SKILL §11 + Appendix C gain the post-deploy audit step | SKILL change log v2.3.0 already describes the script; checklist now points to it |
+| Final gate | lint · typecheck · 71/71 unit · build 20 routes · 83/83 e2e local · live suite green (skips loud) · `rg` drift re-scan clean | All green post-change |

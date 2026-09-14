@@ -142,3 +142,28 @@ All twelve in-scope findings re-measured on the remediated production build — 
 The post-fix VLM pairwise re-review (home, /work, /contact) confirms the structural divergences it previously named are closed; residual VLM commentary maps to the documented acceptances (collage strip, availability pill, dark mode, richer hero copy) plus the two refinements it prompted (open-band estimator, single-line card meta), which were applied. Parity verdict after pass 2: **HIGH design-language parity with documented, deliberate content divergences.**
 
 Regression guards: every fixed finding is pinned by a named Playwright spec (`e2e/parity.spec.ts`, `e2e/estimator.spec.ts`, `e2e/smoke.spec.ts`).
+
+---
+
+## Pass 4 — Live-Deploy Parity Re-Validation (2026-09-14, post-pass-3 redeploy)
+
+**Context:** the live deploy at `https://design-brand-strategy.jesspete.shop` was rebuilt with the pass-3 code (verified live: unknown-slug hard-404, cold-load CLS 0.0000 ×2, full security-header set incl. the CSP analytics origin, no console/page errors on any route). This pass re-validates visual fidelity against the source (`https://editorial-portfolio-9d8e325b.lovable.app`) on the live artifact rather than the local build.
+
+**Method (repo methodology, lesson L13):** Playwright-driven capture with scroll-through (reveal settlement) on both sites → full-page screenshots of 6 aligned surfaces → VLM pairwise comparison (`z-ai vision`, SOURCE=image 1 / LIVE=image 2, structured FIDELITY/GAPS/VERDICT prompts) → **every VLM-flagged gap verified against the live DOM before acceptance** → rendered-geometry probes (aspect ratios, grid columns, page heights).
+
+**Results:**
+
+| Surface | VLM verdict | VLM-flagged gaps → DOM verification |
+|---|---|---|
+| Home | high | "scattered overlapping Selected Work layout" → live renders a 2-col grid (`616px 616px`), 4 work links — misread (marquee/collage impression); "footer cipher text" → the deterministic collage character block, intentional original element |
+| /work | high | "missing header sub-label" → present ("Elena Vance \| DESIGN & BRAND STRATEGY"); "footer connect layout" → social links present (Instagram/LinkedIn/X) |
+| /work/meridian | medium | "lacks theme toggle" → present in header; "hero full-width at top vs inline" → hero renders after the H1 exactly like source, 7:3 both (2.333); "missing Challenge/Solution sections" → present ("The challenge" / "The approach" / "After launch" = outcome); sidebar sticky meta present |
+| /about | medium | "missing Approach 3-column grid" → present (two 3-col grids probed); "missing image caption" → captions present; "missing theme toggle" → present |
+| /services | high | "missing italic sub-headlines" → present (5 probed, e.g. "The face, voice, and posture of the business."); "missing dividers" → 3 top-level bordered sections; "missing Investment label" → present |
+| /contact | high | "missing Timeline/Deliverables estimator columns" → all four groups present (case-insensitive probe; CSS `text-transform: uppercase` had defeated the naive one), 4 radiogroups, gated estimate + timeline durations present; "missing footer email" → present |
+
+**Geometry probes:** /work cover rhythm byte-identical to source (`[1.6, 0.8] ×4`); case hero 2.333 (7:3) on both; marquee mixed shapes match (0.8 tall / 1.25 wide / 1.333 landscape, sub-pixel rounding); H1/copy differences are the documented deliberate original content.
+
+**Verdict:** parity re-confirmed **HIGH design-language fidelity** on the live deploy. All VLM-flagged structural gaps were DOM-refuted misreads; no actionable visual findings. VLM utility note re-confirmed (L13): VLM verdicts are triage — numbers and DOM probes are the contract.
+
+Artifacts: `/home/z/my-project/tool-results/parity-pass4/` (11 source + 7 live screenshots, geometry JSON, VLM results).

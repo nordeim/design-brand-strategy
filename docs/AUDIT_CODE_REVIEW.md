@@ -182,3 +182,60 @@ lint ✅ · typecheck (incl. e2e+scripts) ✅ · 52/52 ✅ · build 20 routes �
 2. **R2-2 (AUD-2):** correct the PII-posture wording in SKILL §13 + route comment; add retention guidance ("treat logs containing `contact_inquiry` as PII-bearing; drain to a bounded-retention sink").
 3. **R2-3 (AUD-3):** record the accepted-risk analysis in the audit (done, above) + a `bun audit` step note in SKILL §11 as a periodic (not per-ship) check.
 4. **R2-4 (AUD-4/5/6):** documented-accepted, no code change.
+
+---
+
+# Pass 4 — Tiered Code Review + Security Audit (2026-09-14, fourth session)
+
+**Scope:** post-remediation-pass-4 codebase (environment-aware contact e2e specs + `classifyBurstStatuses` + `scripts/live-deploy-audit.mjs` + docs realignment). **Method:** per `skills/code-quality-standards` (Six-Axis review) + `skills/security-and-hardening` (boundary/injection/header discipline) + `skills/code-review-checklist` (12-category scan); four tiers — Tier 0 documented-contract verification (AGENTS/CLAUDE/README/SKILL/PAD), Tier 1 mechanical gates + structural invariants + dependency/secret scans, Tier 2 Six-Axis source review (all files under `src/`, `e2e/`, `scripts/`, configs — `skills/` excluded by operator contract), Tier 3 security audit with runtime probes against the local production server. **Question asked:** *does the codebase match its documented contracts and is it safe to ship?*
+
+## Tier 0 — Documented contracts: **MATCH with 3 drift findings (all in `Project_Architecture_Document.md`)**
+
+The four core contracts (AGENTS.md, CLAUDE.md, README.md, SKILL.md v2.3.0) re-verified claim-by-claim: 71/71 unit (8 files), 83/83 e2e full-strength locally with loud skips on edge-fronted origins, typecheck covers e2e+scripts, CSP transcription byte-accurate, no root loading.tsx, `dynamicParams=false`, Prisma fail-open, env table accurate, counts/versions cross-consistent. **The PAD was not touched by the pass-4 docs round:**
+
+| ID | Finding | Evidence | Disposition |
+|---|---|---|---|
+| T0-1 | PAD still claims "currently 62 tests across 8 files" (line ~493) — now 71 | `rg "62 tests" Project_Architecture_Document.md` | **Fix docs (R4-1)** |
+| T0-2 | PAD ADR-009 rationale says "tests spoof unique `x-forwarded-for` values" without the edge-fronted qualification added everywhere else | PAD line ~135 | **Fix docs (R4-1)** |
+| T0-3 | PAD tooling sections predate `scripts/live-deploy-audit.mjs` and `classifyBurstStatuses` | PAD §testing/tooling | **Fix docs (R4-1)** |
+
+## Tier 1 — Mechanical gates: **ALL GREEN**
+
+lint ✅ · typecheck (e2e+scripts) ✅ · 71/71 unit ✅ · build 20 routes ✅ · 83/83 e2e local ✅ · live run: 74 passed + 4 skipped, re-run green ✅ · structural invariants re-verified: upward imports 0, TS/eslint suppressions 0, `any` 0, `use client` = 6 files (5 components + `error.tsx` boundary — documented), raw colors in components 0 (icon.svg asset excluded, known), secrets/key-material scan clean (only `scripts/skill-verify.sh` validation-marker strings — re-checked), `bun audit` = exactly the one known accepted item (AUD-3: `deepmerge-ts@7.1.5` HIGH advisory, transitive CLI-only via `prisma`→`@prisma/config` exact pin; runtime `@prisma/client` zero-dep; unchanged since pass 3).
+
+## Tier 2 — Six-Axis source review: **Approve**
+
+All source, spec, script, and config files read (fresh full pass). New pass-4 code specifically:
+
+| Axis | Verdict | Evidence |
+|---|---|---|
+| Correctness | Approve | `classifyBurstStatuses` unit-pinned (9 tests incl. boundary, all-429, broken-shape, too-short); spec behavior verified on BOTH origin types (local: full-strength assertions, zero skips; live: loud skips with evidence; immediate re-run inside the 10-min window: green via skips — idempotency is a new property the suite did not have); `live-deploy-audit.mjs` verified against local (6/6) and live (5/6 with the documented deploy-state failure) |
+| Readability | Approve | Every skip carries its evidence in the reason string; why-comments explain the AUD-1 interaction; the classifier's doc-comment states the three verdicts and their meanings |
+| Architecture | Approve | Classifier colocated with `clientKey` in `src/lib/rate-limit.ts` (keying semantics is one concern); e2e imports `../src/lib/rate-limit` following the established `../src/data/*` spec-import pattern; deploy-state tooling lives in `scripts/`, not the spec suite (code-contract vs deploy-state separation) |
+| Security | Approve | The skip logic cannot mask regressions on self-managed origins (verdict "broken" fails loudly; local run keeps exact assertions); no new trust boundaries, inputs, or dependencies introduced |
+| Performance | Approve | Zero additional HTTP requests introduced by the spec changes (the burst spec reuses its existing 7 requests; skip decisions are in situ); audit script cost is operator-invoked only |
+| Aesthetic/UX rigor | N/A (test/tooling layer) | — |
+
+Non-blocking nit: `live-deploy-audit.mjs`'s CLS check would report 0.0000 for a fully dead page load (`goto` catch + timeout) — mitigated in practice because checks 1–5 already fail loudly when the origin is down; acceptable for a best-effort deploy-state tool.
+
+## Tier 3 — Security audit (runtime probes, local production server :3197)
+
+| ID | Severity | Finding | Evidence | Disposition |
+|---|---|---|---|---|
+| AUD-10 | Pass | **AUD-1 fix re-verified behaviorally**: with `cf-connecting-ip: 198.51.100.77` fixed and seven distinct forged first-hop XFF values, responses were `202×5, 429, 429` — the shared cf key rate-limits on the 6th; a fresh cf IP (`203.0.113.99`) gets 202 (isolated) | Probes P4/P5 |
+| AUD-11 | Pass | Method discipline: GET/PUT/DELETE on `/api/contact` → 405; malformed JSON → 400 JSON; **2.5MB oversized body → clean 400, server alive afterward** (health 200) | Probes P1/P2 |
+| AUD-12 | Pass | No input reflection anywhere in API responses (static messages only); stored inquiries have **no HTML rendering path** (no admin/read surface — Prisma Studio only) → no stored-XSS surface today; React auto-escaping guards any future render path | Probe P9 + tree inspection |
+| AUD-13 | Pass | `db/custom.db` and `.env` are not web-servable (404); SQLite file lives outside `public/` | Probe P7 |
+| AUD-14 | Info | Control-char XFF header → graceful 400, server stays healthy (no parser crash) | Probe P6 |
+| AUD-15 | Info | Honeypot remains client-side only (direct POST with `website` filled persists — zod strips unknown keys): documented accepted design (pass-3 AUD-4); the limiter is the bound and AUD-10 confirms it holds | Probe P8 |
+| AUD-16 | Info | The one open deploy-state item is operator-side, not code: Cloudflare **Email Address Obfuscation is still ON** (2 rewrites in live `/contact` HTML) — now machine-checked by `scripts/live-deploy-audit.mjs` with its dashboard remediation hint | Live audit run |
+
+## Verdict
+
+**Safe to ship.** Zero Critical/High runtime vulnerabilities; all six quality gates green on both origin types; the Tier-2 review approves the pass-4 changes; Tier 3 re-confirms the hardened API surface. The remediation backlog is documentation-only (PAD realignment, R4-1) plus two low-value tooling notes (R4-2 SKILL §11/Appendix C cross-reference for the new audit script; R4-3 optional dead-page guard in the audit script's CLS check — recommended deferral).
+
+## Remediation backlog (second cycle of pass 4)
+
+1. **R4-1 (T0-1/2/3, docs):** realign `Project_Architecture_Document.md` — 62→71 tests, qualify the ADR-009 XFF claim with the P4-F1 edge-fronted behavior, add `classifyBurstStatuses` + `scripts/live-deploy-audit.mjs` to the testing/tooling inventory.
+2. **R4-2 (docs):** SKILL.md §11 pre-ship checklist + Appendix C gain the post-deploy step "run `scripts/live-deploy-audit.mjs` against the live origin" so the deploy gate is discoverable from the shipping checklist.
+3. **R4-3 (optional, defer):** dead-page guard in `live-deploy-audit.mjs` CLS check (verify the navigation produced a non-empty DOM before scoring CLS). Low value while checks 1–5 gate origin liveness; deferred with rationale.

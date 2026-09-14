@@ -132,7 +132,8 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 **ADR-009: Playwright e2e layer validating the production artifact**
 
 - **Context:** The original verification story was unit tests plus manual smoke (curl + agent-browser probes). Visual/interaction parity facts lived in audit documents but had no executable regression guards, and dev-HMR hydration can diverge from the shipped build.
-- **Decision:** Add a Playwright suite (`playwright.config.ts` + `e2e/*.spec.ts`, 83 specs) adapted from the home-financing reference: a managed `next start` webServer on :3002 validates the production build; projects are Desktop Chromium plus a Pixel-7 mobile-emulation project scoped to `mobile.spec.ts` (the responsive fork); workers are serial because contact-API tests mutate shared in-memory rate-limit state (tests spoof unique `x-forwarded-for` values). Specs import `src/data/*` directly so slugs, images, and titles are data-driven. `@playwright/test` resolves to 1.63.0 (Chromium 153; bun.lock locks it — keep `playwright-core` deduped at exactly one copy, see pass 3).
+- **Decision:** Add a Playwright suite (`playwright.config.ts` + `e2e/*.spec.ts`, 83 specs) adapted from the home-financing reference: a managed `next start` webServer on :3002 validates the production build; projects are Desktop Chromium plus a Pixel-7 mobile-emulation project scoped to `mobile.spec.ts` (the responsive fork); workers are serial because contact-API tests mutate shared in-memory rate-limit state (tests spoof unique `x-forwarded-for` values — which isolates buckets **on self-managed origins only**, see the pass-4 amendment). Specs import `src/data/*` / `src/lib/*` directly so slugs, images, titles, and burst classification are data-driven. `@playwright/test` resolves to 1.63.0 (Chromium 153; bun.lock locks it — keep `playwright-core` deduped at exactly one copy, see pass 3).
+- **Pass-4 amendment (P4-F1, environment awareness):** running the same suite against an edge-fronted external origin (`E2E_BASE_URL`, e.g. the live Cloudflare deploy) changes rate-limit semantics — AUD-1's `cf-connecting-ip`-first keying is unforgeable, so spoofed `x-forwarded-for` values collapse into one shared bucket and the isolation specs cannot (and must not) assert isolation from a single machine. The contact API specs therefore self-diagnose: `classifyBurstStatuses()` (pure, unit-tested in `src/lib/rate-limit.test.ts`) classifies the observed burst statuses as isolated/shared/broken; "shared" produces a loud in-body `test.skip` with the observed evidence, "broken" fails the spec everywhere, and the exact `[202×5, 429]` contract remains asserted on self-managed origins (the authoritative code-contract run; external runs are deploy-state validation). Re-runs against an external origin inside the 10-minute rate-limit window stay green instead of flaking. Deploy-state checks that belong to the operator's dashboard (email obfuscation, edge headers, live CLS) live in `scripts/live-deploy-audit.mjs`, not in the spec suite.
 - **Rationale:** Parity and a11y contracts are only real if a machine re-checks them; testing the built artifact catches hydration/static-generation drift that unit tests cannot; the reference repo's config is a proven pattern worth converging on.
 - **Consequences:** (+) Every audit finding now ships with a named regression guard; the security-header contract, SEO pins, and API discipline are pinned; the estimator and mobile nav are exercised end-to-end. (−) e2e adds ~40s to verification and requires the Chromium binary; with `javaScriptEnabled: false` Playwright locators cannot resolve, so no-JS specs assert through `page.evaluate` (documented in the spec header).
 - **Alternatives Rejected:** Continuing with manual probes (not repeatable in CI); jsdom component tests (cannot validate the built artifact or a11y);
@@ -472,12 +473,14 @@ API surface accepts only the contact payload and answers health checks.
 |----------|-------|-------|----------|-----------|
 | Estimator math | 1 | 9 | `src/lib/estimator.test.ts` | Vitest (node env) |
 | Contact schema + labels | 1 | 11 | `src/lib/contact.test.ts` | Vitest (node env) |
-| Data contracts (aspects, marquee, process, FAQ) | 2 | 18 | `src/data/projects.test.ts`, `src/data/site.test.ts` | Vitest (node env) |
+| Data contracts (aspects, marquee, process, FAQ) | 2 | 16 | `src/data/projects.test.ts`, `src/data/site.test.ts` | Vitest (node env) |
 | No-JS/skip-link markup guards | 1 | 5 | `src/lib/reveal-guard.test.ts` (source-reading) | Vitest (node env) |
 | Sitemap determinism | 1 | 3 | `src/app/sitemap.test.ts` | Vitest (node env) |
-| API contract | — | manual smoke | `bun run start` + curl | — |
-| Route health / headers | — | manual smoke | curl sweep | — |
-| Visual / interaction | — | agent-browser probes | scripts + screenshots + VLM review | — |
+| DATABASE_URL resolver contract | 1 | 8 | `src/lib/wcc/__tests__/db-url.test.ts` | Vitest (node env) |
+| Rate limit (client-key trust order + burst classifier) | 1 | 19 | `src/lib/rate-limit.test.ts` | Vitest (node env) |
+| API contract | — | pinned in e2e | `e2e/contact.spec.ts` (202/400/429/405, per-field errors, environment-aware skips) | Playwright |
+| Route health / headers / hard-404 / stream order | — | pinned in e2e | `e2e/smoke.spec.ts` + `scripts/live-deploy-audit.mjs` (deploy state) | Playwright + node script |
+| Visual / interaction | — | pinned in e2e + audits | `e2e/parity.spec.ts`, `e2e/estimator.spec.ts`, `e2e/mobile.spec.ts`, `e2e/assets.spec.ts`, `e2e/seo.spec.ts`; VLM+geometry audits in `docs/AUDIT_VISUAL_PARITY.md` | Playwright |
 
 ### 7.2 Test Patterns
 
@@ -490,20 +493,23 @@ share. The fail-fast contract is tested explicitly (`RangeError` on unknown ids)
 ### 7.3 Coverage Thresholds
 
 No numeric gate is configured; the standard is: **every branch of `src/lib` logic is exercised**
-and **every data-layer contract is pinned by tests** (currently 62 tests across 8 files covering
+and **every data-layer contract is pinned by tests** (currently 71 tests across 8 files covering
 the estimator, the schema + label maps, project aspect invariants, services/FAQ data, sitemap
-determinism, the no-JS markup guards, the DATABASE_URL resolver, and the rate-limit
-client-key trust order). Rendering is covered by the build's
+determinism, the no-JS markup guards, the DATABASE_URL resolver, the rate-limit
+client-key trust order, and the burst-status environment classifier that backs the
+edge-fronted e2e skip logic). Rendering is covered by the build's
 prerender step (a page that fails to render fails the build).
 
 ### 7.4 Pre-PR / Pre-Deploy Checklist
 
 - [ ] `bun run lint` — zero errors
 - [ ] `bun run typecheck` — zero errors
-- [ ] `bun run test` — all green
+- [ ] `bun run test` — all green (71/71 at pass 4)
 - [ ] `bun run build` — compiles; expected route table printed (20 routes)
 - [ ] Content changes: `curl` the affected route; scroll before screenshotting (reveal pattern)
 - [ ] API changes: smoke 202/400/(429 if limiting touched) + verify security headers still present
+- [ ] After deploy (live origin): `bun scripts/live-deploy-audit.mjs` — health, security headers,
+      hard-404, robots, email-obfuscation OFF, cold-load CLS ≤ 0.1 (P4-F2)
 
 ---
 
@@ -583,6 +589,7 @@ bodies explain "why". The first commit on `main` is the repository owner's promp
 | Priority | Issue | Impact | Status |
 |----------|-------|--------|--------|
 | HIGH | Contact inquiries are logged, not delivered — email/CRM provider must be wired at the `contact_inquiry` log line (`src/app/api/contact/route.ts`) | Production inquiries unreachable without integration | Open (documented integration point) |
+| MEDIUM | Cloudflare **Email Address Obfuscation is ON** on the live zone (dashboard → Scrape Shield) — rewrites `studio@elenavance.com` into `/cdn-cgi/l/email-protection` spans (hydration-mismatch + `[email protected]` flash risk, README § Deployment). Operator dashboard action; machine-checked by `scripts/live-deploy-audit.mjs` (`email-obfuscation` check) | Potential hydration mismatch on live; broken mailto for no-JS visitors | Open (operator action; audit exits red until flipped) |
 | MEDIUM | No CI pipeline — quality gates are local-only (§7.4) | Gate adherence depends on discipline | Open |
 | LOW | In-memory rate limit is per-instance | Limit is N×5 with N instances behind a load balancer | Open (acceptable at expected traffic) |
 | LOW | Marquee `aria-hidden` on duplicated track half only; screen readers announce items once | Minor a11y polish possible | Open |

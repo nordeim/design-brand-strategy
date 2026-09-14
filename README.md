@@ -93,7 +93,8 @@ Contact inquiries persist to SQLite (ADR-011); the `/api/contact` handler valida
  ┣ 📄 rate-limit.ts       # Bounded in-memory limiter
  ┗ 📂 wcc/db-url.ts       # Shared DATABASE_URL resolver (+ tests)
 📂 prisma/schema.prisma     # ContactInquiry model (ADR-011)
-📂 scripts/                 # db.ts (Prisma CLI wrapper), cls-regression.mjs + gap-proxy.mjs (CLS guard)
+📂 scripts/                 # db.ts (Prisma CLI wrapper), cls-regression.mjs + gap-proxy.mjs (CLS guard),
+                          # live-deploy-audit.mjs (post-deploy state gate — see Deployment)
 📂 e2e/                    # 7 Playwright specs (smoke, seo, assets, contact,
                           # estimator, parity, mobile) + playwright.config.ts
 📂 public/images/           # 19 generated WebP originals
@@ -159,9 +160,13 @@ bun run e2e:all           # + mobile project (Pixel 7 emulation, hamburger menu)
 bun run e2e:report        # open the HTML report
 bun scripts/cls-regression.mjs   # cold-load CLS guard (gap-proxy harness,
                           # worst CLS <= 0.1 — ADR-012)
+bun scripts/live-deploy-audit.mjs  # post-deploy state gate against the live
+                          # origin (or LIVE_URL=<url>): health, security
+                          # headers, hard-404, robots, email-obfuscation OFF,
+                          # cold-load CLS (P4-F2)
 ```
 
-The e2e suite covers: critical surfaces and the security-header contract (including the Cloudflare-analytics script origin), SEO pins (13-URL sitemap, exact titles, per-case OG images), the full image inventory, the contact API contract (202/400/429 + Retry-After, per-field errors, honeypot swallow) and form funnel, estimator wiring (gated estimate, label parity, deep-links), parity regression guards (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee motion contract, theme persistence), the mobile navigation overlay, unknown-slug hard-404s, and the document-order HTML stream guard (cold-load CLS). Requires a production build first (`bun run build`) and the Playwright Chromium binary (`bunx playwright install chromium`).
+The e2e suite covers: critical surfaces and the security-header contract (including the Cloudflare-analytics script origin), SEO pins (13-URL sitemap, exact titles, per-case OG images), the full image inventory, the contact API contract (202/400/429 + Retry-After, per-field errors, honeypot swallow) and form funnel, estimator wiring (gated estimate, label parity, deep-links), parity regression guards (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee motion contract, theme persistence), the mobile navigation overlay, unknown-slug hard-404s, and the document-order HTML stream guard (cold-load CLS). The contact API specs are environment-aware (P4-F1): against a self-managed origin (local/CI) they run at full strength with per-test spoofed `x-forwarded-for` isolation; against an edge-fronted external server (`E2E_BASE_URL`, e.g. the live Cloudflare deploy) where AUD-1 keying makes spoofing ineffective, the isolation-dependent specs detect the shared bucket in situ and skip loudly with evidence instead of failing. Requires a production build first (`bun run build`) and the Playwright Chromium binary (`bunx playwright install chromium`).
 
 Production smoke (as executed for the initial release): `bun run build && bun run start`, then
 `POST /api/contact` with a valid payload (expect `202`), an invalid payload (expect `400` + field
@@ -193,8 +198,10 @@ Any Node-capable host (Vercel zero-config, or `bun run build && bun run start` b
 
 **Cloudflare-fronted deploys (measured on the live site):**
 - The app CSP allows `https://static.cloudflareinsights.com` in `script-src` so the host's Web Analytics beacon is not blocked.
-- **Disable Email Address Obfuscation** (dashboard → Scrape Shield): it rewrites `studio@elenavance.com` in the SSR HTML into obfuscated spans, risking React hydration mismatches and flashing `[email protected]` before the decode script runs.
+- **Disable Email Address Obfuscation** (dashboard → Scrape Shield): it rewrites `studio@elenavance.com` in the SSR HTML into obfuscated spans, risking React hydration mismatches and flashing `[email protected]` before the decode script runs. As of 2026-09-14 this is **still ON** on the live zone (2 rewrites in the `/contact` HTML) — `bun scripts/live-deploy-audit.mjs` fails its `email-obfuscation` check until the toggle is flipped.
+- Cloudflare may prepend a **Managed Content** preamble to `robots.txt` (content-signal declarations + AI-bot blocks). The app's own directives (`Allow: /`, `Disallow: /api/`, the `Sitemap:` pointer) remain below it — expected edge behavior, not an app defect; the audit script verifies the app directives survive.
 - Serving is stream-through: HTML arrives chunked — exactly what the ADR-012 document-order stream contract protects against (cold-load CLS).
+- **Run the post-deploy state gate** after every deploy and dashboard change: `bun scripts/live-deploy-audit.mjs` (6 checks: health, security-header contract, hard-404, robots, email-obfuscation OFF, cold-load CLS ≤ 0.1).
 
 ## License
 

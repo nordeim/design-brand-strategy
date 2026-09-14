@@ -10,9 +10,9 @@ description: >
   architecture, content-as-code data layer, accessibility implementation,
   anti-patterns, debugging procedures, and hard-won lessons from the build
   and every subsequent remediation pass.
-version: 2.2.0
+version: 2.3.0
 last_updated: 2026-09-14
-project_state: 62/62 unit tests green · 83/83 Playwright e2e specs green · tsc --noEmit clean (covers e2e/ + scripts/) · eslint clean · next build 20 routes · main @ post-remediation pass 3 (see Appendix B)
+project_state: 71/71 unit tests green · 83/83 Playwright e2e specs green (full strength locally; edge-fronted external runs skip isolation specs loudly, P4-F1) · tsc --noEmit clean (covers e2e/ + scripts/) · eslint clean · next build 20 routes · main @ post-remediation pass 4 (see Appendix B)
 ---
 
 # design-brand-strategy — Engineering SKILL
@@ -37,6 +37,8 @@ project_state: 62/62 unit tests green · 83/83 Playwright e2e specs green · tsc
 > **v2.1.0 change log:** adds the Playwright e2e layer (ADR-009, 81 specs) and the pass-2 parity redesign (ADR-010): static four-group estimator with gated estimate, /work closing CTA band, portrait 4:5 + uniform 7:3 case heroes, 3-column home-services and about-approach grids, text-left/portrait-right home/about heroes, 5-step horizontal process, minimal card meta grammar, source-range marquee shapes, single-column contact fields (form left / info right), referral select, timeline labels with durations. New lesson L13.
 >
 > **v2.2.0 change log:** documents the codebase after remediation pass 3 (2026-09-14 live-site validation → fix cycle): ADR-011 (Prisma SQLite `ContactInquiry` persistence, fail-open) folded in; ADR-012 (document-order HTML stream — root loading boundary removed after the measured cold-load CLS 0.31 + soft-404 on the live deploy); `/work/[slug]` `dynamicParams = false`; CSP allows the Cloudflare analytics beacon origin; playwright-core deduped (1.63.0, Chromium 153) so typecheck again covers e2e/ + scripts/; git hygiene (db/custom.db, .env, package-lock.json untracked); `scripts/cls-regression.mjs` + `scripts/gap-proxy.mjs` CLS harness; `docs/ssh_git_wrapper_v3.py` + push runbook. New lessons L14–L15.
+>
+> **v2.3.0 change log:** documents the codebase after remediation pass 4 (2026-09-14 second live-site validation → fix cycle): the full e2e suite run against the live Cloudflare-fronted deploy exposed that the two rate-limit isolation specs (and, on re-runs inside the 10-min window, the other API-contract specs) assume a self-managed origin — AUD-1's `cf-connecting-ip` keying makes `x-forwarded-for` spoofing ineffective behind an edge, so all requests from one machine share one bucket. Fix (P4-F1, TDD): `classifyBurstStatuses()` pure classifier (unit-tested, 9 new tests → 71 total) + in-body dynamic `test.skip`s with evidence, making live runs idempotent while local runs keep full-strength assertions; `scripts/live-deploy-audit.mjs` (P4-F2) turns the pass-3 operator next-steps into a repeatable 6-check post-deploy gate (health, security headers, hard-404, robots, email-obfuscation OFF — currently failing on the live zone until the dashboard toggle is flipped, cold-load CLS); docs record the CF Managed robots.txt preamble. Visual parity re-verified HIGH (VLM pairwise + DOM refutation of every flagged gap + exact aspect-rhythm probes). New lesson L16.
 
 ## Table of Contents
 
@@ -72,7 +74,7 @@ project_state: 62/62 unit tests green · 83/83 Playwright e2e specs green · tsc
 brand strategist ("Elena Vance", New York) — a five-page marketing site with a
 static four-group investment estimator (gated estimate) and a validated
 contact form, built as a fully static Next.js 16 application with two API
-routes, verified by 62 unit tests and an 83-spec Playwright e2e suite,
+routes, verified by 71 unit tests and an 83-spec Playwright e2e suite,
 with contact inquiries persisted to a single SQLite table (ADR-011).
 
 **The design thesis: warm editorial print.** The site behaves like a
@@ -143,7 +145,7 @@ portfolio you can almost feel.
 library, no component library (no shadcn/Radix), no analytics scripts of our
 own, no i18n, no Docker. (Persistence is deliberately minimal: one SQLite
 table for contact inquiries — ADR-011; editorial content remains code.
-Testing, by contrast, is deliberately rich: 62 unit tests + an 83-spec
+Testing, by contrast, is deliberately rich: 71 unit tests + an 83-spec
 Playwright e2e suite — ADR-009.)
 See Appendix A for the rationale of each.
 
@@ -164,7 +166,7 @@ lockfile). **Never downgrade or float these without re-running the full
 | Validation | `zod` | **3.25.76** | One schema (`contactSchema`) enforced at two boundaries (client inline + API authoritative) — ADR-004. |
 | Icons | `lucide-react` | **1.45.0** | Only `Menu`, `X`, `Sun`, `Moon`, `ArrowRight`, `ChevronDown` are used. Tree-shaken; no icon fonts. |
 | Language | `typescript` | **5.9.3** | `strict: true`, `noEmit`, `moduleResolution: "bundler"`, path alias `@/* → ./src/*`. |
-| Tests | `vitest` | **4.1.11** | `environment: "node"`, includes `src/**/*.test.ts`. 62 tests / 8 files — pure functions, data contracts, source-reading guards, the DATABASE_URL resolver contract, and the rate-limit client-key trust order. No jsdom. |
+| Tests | `vitest` | **4.1.11** | `environment: "node"`, includes `src/**/*.test.ts`. 71 tests / 8 files — pure functions, data contracts, source-reading guards, the DATABASE_URL resolver contract, the rate-limit client-key trust order, and the burst-status environment classifier. No jsdom. |
 | E2E | `@playwright/test` | **1.63.0** | 83 specs in `e2e/` (7 files) + `@axe-core/playwright` 4.13.0. Chromium (153) + Pixel-7 projects against the production build (`next start` :3002). bun.lock locks it — keep `playwright-core` deduped at exactly one copy (a stale 1.62.0 root copy once forced a nested 1.63.0 and broke `tsc` on the specs). |
 | Persistence | `prisma` + `@prisma/client` | **6.19.3** | One `ContactInquiry` model (SQLite `db/custom.db`, ADR-011). Shared `DATABASE_URL` resolver `src/lib/wcc/db-url.ts` (CLI + runtime + standalone); `src/lib/db.ts` runtime singleton; `scripts/db.ts` CLI wrapper behind `db:generate`/`db:push`. |
 | Lint | `eslint` + `eslint-config-next` | **9.39.5** / 16.3.4 | Flat config (`eslint.config.mjs`) extending `eslint-config-next/core-web-vitals`. |
@@ -220,7 +222,7 @@ Quality gates (the only commands you ever need — all wired in `package.json`):
 ```bash
 bun run lint        # eslint .            — flat config, core-web-vitals
 bun run typecheck   # tsc --noEmit        — strict (covers e2e/ + scripts/)
-bun run test        # vitest run          — 62 tests, node environment
+bun run test        # vitest run          — 71 tests, node environment
 bun run build       # next build          — 20 routes
 bun run e2e         # playwright chromium — 78 specs against the built artifact
 bun run e2e:all     # + Pixel-7 mobile    — 83 specs total (serial workers)
@@ -836,7 +838,7 @@ repo's history (B-1, B-2, L7).
 ```bash
 bun run lint        # 1. eslint . — zero warnings tolerated
 bun run typecheck   # 2. tsc --noEmit — strict (includes e2e/ specs)
-bun run test        # 3. vitest run — 62/62 (count grows with new tests)
+bun run test        # 3. vitest run — 71/71 (count grows with new tests)
 bun run build       # 4. next build — expect "20 routes" / 0 errors
 bun run e2e:all     # 5. playwright — 83/83 against the fresh production build
 bun scripts/cls-regression.mjs   # 6. cold-load CLS guard — worst CLS <= 0.1 (ADR-012)
@@ -866,10 +868,23 @@ headers present; screenshots non-blank **after the script's scroll step**.
 (The e2e suite in step 5 now covers most of this mechanically; the script
 remains the human-friendly sweep.)
 
-**7. Content sanity:** `SITE.url` matches the deployment origin; featured
+**7. Post-deploy state gate (P4-F2)** — after every deploy to the live origin
+(and after any dashboard change, e.g. Cloudflare Scrape Shield):
+```bash
+bun scripts/live-deploy-audit.mjs   # LIVE_URL overridable; exit 1 names the fix
+```
+Checks health, the security-header contract, hard-404, robots (app directives
+survive the CF managed-content preamble), **email-obfuscation OFF** (the one
+dashboard toggle the code cannot fix — currently failing on the live zone as
+of 2026-09-14), and cold-load CLS on the real network. The e2e suite validates
+the code contract against a self-managed origin; this script validates the
+operator's deploy state — a red exit is a dashboard/edge action, not a code
+regression (see §10 known-issues framing in the PAD).
+
+**8. Content sanity:** `SITE.url` matches the deployment origin; featured
 count = 4; every `estimatorId` non-null value exists in `ESTIMATOR_SERVICES`.
 
-**8. Git gates:** work committed on `main` (no feature branches, operator
+**9. Git gates:** work committed on `main` (no feature branches, operator
 contract); `git status` clean after commit; remote verified post-push.
 
 ---
@@ -995,6 +1010,29 @@ by listening port (`ss -ltnp` → PID → `kill -9`) or by PID captured at
 spawn. Symptom to remember: `EADDRINUSE` in the server log while a fresh
 `next start` claims to be serving. Any "fix didn't work" conclusion after a
 server restart deserves a port-level verification first.
+
+**L16. A test suite inherits its origin's semantics — the same spec means
+different things behind an edge proxy.** Running the full e2e suite against
+the live Cloudflare-fronted deploy (the documented `E2E_BASE_URL` use case)
+failed two rate-limit specs that were green locally for 83/83: AUD-1's
+(correct) `cf-connecting-ip`-first keying means a client cannot forge bucket
+identity, so per-test spoofed `x-forwarded-for` values all collapse into ONE
+bucket — the earlier specs' requests had already consumed it (the limiter
+runs BEFORE validation, so 400s count too), and the isolation probe itself
+proved the sharing. The fix was not to weaken the specs or "fix" the limiter
+but to make the specs **self-diagnosing**: a pure classifier
+(`classifyBurstStatuses`, unit-tested) distinguishes "isolated" (exact
+`[202×5, 429]`) from "shared" (early 429s) from "broken" (never trips —
+fail loudly), and in-body dynamic `test.skip`s carry the evidence into the
+report. General rules: (a) when a suite runs against external deployments,
+identity spoofing headers may be overwritten by infrastructure — probe what
+the target actually keys on instead of assuming; (b) never let environment
+state fail a spec silently OR silently pass — skip LOUDLY with the observed
+evidence; (c) keep the self-managed run the authoritative contract check and
+treat external runs as deploy-state validation; (d) separate deploy-state
+checks (dashboard toggles like Cloudflare Email Obfuscation) from code
+contracts — a script (`scripts/live-deploy-audit.mjs`) with explicit
+remediation hints, not a spec, is the right home for those.
 
 ---
 
@@ -1517,12 +1555,22 @@ SKILL-level summary):
 | ADR-011 acceptance (Prisma SQLite) | 2026-09-13 | `ContactInquiry` model + shared `DATABASE_URL` resolver + fail-open API write + CI DB provisioning | 52/52 unit (was 44), build + e2e green — see `docs/ADR-011-prisma-sqlite.md` |
 | Pass 3 — live-site validation + remediation (TDD) | 2026-09-14 | 81/81 e2e run against the live deploy; CWV/CLS probing; VLM + geometry parity re-audit vs the source; docs/hygiene alignment audit post-`50c357f` | RED→GREEN: root loading boundary removed (ADR-012 — CLS 0.31→0.0000 via gap-proxy harness, soft-404 200→404), `dynamicParams=false`, CSP + CF analytics origin, playwright-core dedupe (typecheck covers e2e again), git hygiene (db/custom.db/.env/package-lock untracked), SSH push tooling; 52 unit + 83 e2e green — see `docs/REMEDIATION_PLAN.md` § Pass 3 |
 | Pass 3 — tiered code review + security audit (2nd cycle, TDD) | 2026-09-14 | Six-Axis review of all sources + OWASP-style probes (methods, malformed/oversized bodies, rate-limit spoofing, secret/key scans, dep audit) — `docs/AUDIT_CODE_REVIEW.md` § Pass 3 | 0 Critical; AUD-1 rate-limit client-key hardened (cf-connecting-ip → last XFF hop; 10 new unit tests, 62/62) ; AUD-2 PII posture docs corrected; AUD-3 deepmerge-ts accepted-risk recorded (CLI-only transitive); safe-to-ship verdict |
+| Pass 4 — second live-site validation + remediation (TDD) | 2026-09-14 | Full e2e suite re-run against the live deploy (redeployed with pass-3 code: hard-404 + CLS 0.0000 + CSP beacon verified live); VLM pairwise + DOM + geometry parity re-audit vs the source site; deploy-state probes (email obfuscation, robots, console/hydration errors) | RED→GREEN: rate-limit isolation specs made environment-aware (P4-F1 — `classifyBurstStatuses` classifier, 9 new unit tests → 71/71; live runs skip loudly with evidence, local runs keep full-strength assertions, re-runs inside the 10-min window stay green); `scripts/live-deploy-audit.mjs` post-deploy state gate (P4-F2 — 6/6 local, 5/6 live with the email-obfuscation dashboard toggle as the one open operator action); CF Managed robots.txt preamble documented; parity verdict re-confirmed HIGH — see `docs/REMEDIATION_PLAN.md` § Pass 4 |
 
 ## Appendix C: Post-Deploy Live-Site Validation
 
 **What live testing catches that CI cannot:** reveal-hidden content in real
 viewports (B-1), actual rendered contrast, header/anchor interactions,
 marquee seam behavior, CSP in effect, API latency. The protocol:
+
+**Machine-checkable subset (P4-F2):** checks 2–5 below are automated by
+`scripts/live-deploy-audit.mjs` (run it against the live origin — or any
+`LIVE_URL` — after every deploy; exit 1 prints the remediation hint per
+failed check, e.g. the Cloudflare Email-Obfuscation dashboard toggle). The
+e2e suite can also run against the live origin via `E2E_BASE_URL` — the
+contact API specs self-diagnose edge-fronted keying and skip isolation
+assertions loudly (P4-F1, L16). Steps 6–7 (visual/scroll discipline) remain
+manual by design.
 
 1. **Prod server, not dev** — `bun run build && bun run start -- -p 3001`
    (dev overlays and warnings mask real behavior).
@@ -1546,10 +1594,13 @@ marquee seam behavior, CSP in effect, API latency. The protocol:
 7. **The reference script** — `/home/z/my-project/scripts/smoke_test.sh`
    automates 2–6 and lands artifacts in `/home/z/my-project/tool-results/dbs/`.
 
-*End of skill document (v2.2.0). Produced by the six-phase distillation
+*End of skill document (v2.3.0). Produced by the six-phase distillation
 process; every claim is checkable against the repository. History: v1.0.0
 distilled the codebase at `f014842`; v2.0.0 adds remediation-pass-1
 knowledge (ADR-007/008, lessons L9–L12, resolved findings, audit history);
 v2.1.0 adds the e2e layer + pass-2 parity redesign (ADR-009/010, L13);
 v2.2.0 adds ADR-011/012, the pass-3 live-site validation + remediation
-(lessons L14–L15), the CLS harness, and the SSH push tooling.*
+(lessons L14–L15), the CLS harness, and the SSH push tooling; v2.3.0 adds
+the pass-4 environment-aware e2e semantics (P4-F1, `classifyBurstStatuses`,
+lesson L16) and the post-deploy state gate `scripts/live-deploy-audit.mjs`
+(P4-F2).*

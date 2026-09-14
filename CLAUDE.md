@@ -94,8 +94,8 @@ and `NEXT_PUBLIC_SITE_URL` (metadata URLs).
 
 ### Test Pyramid
 
-- **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema + option labels (`contact.test.ts`), data contracts (project aspect alternation, marquee shapes, process/FAQ data, image-path integrity — `src/data/*.test.ts`), sitemap determinism (`src/app/sitemap.test.ts`), source-reading markup guards for the no-JS reveal fallback and skip link (`src/lib/reveal-guard.test.ts`), and the shared DATABASE_URL resolver contract (`src/lib/wcc/__tests__/db-url.test.ts`) — 62 tests / 8 files (incl. the rate-limit client-key trust order, AUD-1).
-- **Integration/API (pinned in e2e)**: the `POST /api/contact` contract (202 valid / 400 invalid with field errors / 429 over-limit with Retry-After) and route health run inside `e2e/contact.spec.ts` against the managed production webServer.
+- **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema + option labels (`contact.test.ts`), data contracts (project aspect alternation, marquee shapes, process/FAQ data, image-path integrity — `src/data/*.test.ts`), sitemap determinism (`src/app/sitemap.test.ts`), source-reading markup guards for the no-JS reveal fallback and skip link (`src/lib/reveal-guard.test.ts`), the shared DATABASE_URL resolver contract (`src/lib/wcc/__tests__/db-url.test.ts`), and the rate-limit client-key trust order + burst-classification verdicts (AUD-1, P4-F1) — 71 tests / 8 files.
+- **Integration/API (pinned in e2e)**: the `POST /api/contact` contract (202 valid / 400 invalid with field errors / 429 over-limit with Retry-After) and route health run inside `e2e/contact.spec.ts` against the managed production webServer. The specs are environment-aware (P4-F1): on an edge-fronted external origin (`E2E_BASE_URL`, e.g. the live Cloudflare deploy) AUD-1 keying makes per-test `x-forwarded-for` spoofing ineffective, so the isolation-dependent specs classify the observed statuses (`classifyBurstStatuses`) and skip loudly with evidence — re-running the suite against such an origin inside the 10-minute window stays green instead of flaking.
 - **E2E (present — 83 specs)**: Playwright suite in `e2e/`: `smoke` (critical surfaces + security-header contract incl. the Cloudflare-analytics script origin + axe critical gates + unknown-slug hard-404 + document-order HTML stream guard), `seo` (sitemap/robots/title pins/per-case OG), `assets` (data-driven image inventory), `contact` (API contract + form funnel + honeypot), `estimator` (static-group wiring, gated estimate, deep-links), `parity` (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee motion contract, theme persistence), `mobile` (hamburger overlay, scroll lock, Escape focus return). Runs `next start` on :3002 — the shipped artifact, never dev HMR. `scripts/cls-regression.mjs` (gap-proxy harness) guards the cold-load CLS contract (ADR-012).
 
 ### Test Commands
@@ -105,6 +105,9 @@ bun run test                      # all unit tests
 bunx vitest run estimator         # a single file
 bunx vitest run -t "rounds"       # tests matching a name
 bun run build && bun run e2e:all  # full e2e (needs a fresh production build)
+bun scripts/live-deploy-audit.mjs # post-deploy state gate (P4-F2) — health,
+                                  # security headers, hard-404, robots, email
+                                  # obfuscation OFF, cold-load CLS vs LIVE_URL
 ```
 
 Tests live beside their modules as `*.test.ts`; vitest config resolves `@` → `./src`.
