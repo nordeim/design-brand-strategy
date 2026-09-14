@@ -10,9 +10,9 @@ description: >
   architecture, content-as-code data layer, accessibility implementation,
   anti-patterns, debugging procedures, and hard-won lessons from the build
   and every subsequent remediation pass.
-version: 2.3.0
+version: 2.4.0
 last_updated: 2026-09-14
-project_state: 71/71 unit tests green · 83/83 Playwright e2e specs green (full strength locally; edge-fronted external runs skip isolation specs loudly, P4-F1) · tsc --noEmit clean (covers e2e/ + scripts/) · eslint clean · next build 20 routes · main @ post-remediation pass 4 (see Appendix B)
+project_state: 71/71 unit tests green · 83/83 Playwright e2e specs green (full strength locally; edge-fronted external runs skip isolation specs loudly, P4-F1) · tsc --noEmit clean (covers e2e/ + scripts/) · eslint clean · next build 20 routes · main @ post-remediation pass 5 (see Appendix B)
 ---
 
 # design-brand-strategy — Engineering SKILL
@@ -160,7 +160,7 @@ lockfile). **Never downgrade or float these without re-running the full
 | Layer | Technology | Version (installed) | Critical Note |
 |---|---|---|---|
 | Framework | `next` | **16.3.5** | App Router only. No `middleware.ts`/`proxy.ts`. Security headers emitted from `next.config.ts` `headers()`, not from an edge proxy. |
-| UI runtime | `react` / `react-dom` | **19.3.0** | Server Components by default; only 5 of 10 `src/components` files are `"use client"` (§5). |
+| UI runtime | `react` / `react-dom` | **19.3.0** | Server Components by default; only 5 of 11 `src/components` files are `"use client"` (§5). |
 | Styling | `tailwindcss` + `@tailwindcss/postcss` | **4.3.3** | CSS-first. There is **no `tailwind.config.ts`** — every token lives in `globals.css` `@theme inline`. Dark mode is class-based via `@custom-variant dark`. |
 | PostCSS | `postcss` | **8.5.28** | Only plugin: `@tailwindcss/postcss`. |
 | Validation | `zod` | **3.25.76** | One schema (`contactSchema`) enforced at two boundaries (client inline + API authoritative) — ADR-004. |
@@ -195,7 +195,7 @@ generated routes. `images.unoptimized: true` (ADR-006) — `next/image` is
 still used for layout discipline, but optimization is delegated to the host.
 
 **Repo facts an agent should internalize:**
-- 3,233 lines of TS/TSX/CSS across 33 source files under `src/`.
+- 3,611 lines of TS/TSX/CSS across 33 source files under `src/` (plus 8 co-located test files).
 - 19 generated original images in `public/images/` (~2.4 MB total, WebP).
 - Git: `main` only, no feature branches by operator contract; remote is
   `git@github.com:nordeim/design-brand-strategy.git`.
@@ -1556,6 +1556,8 @@ SKILL-level summary):
 | Pass 3 — live-site validation + remediation (TDD) | 2026-09-14 | 81/81 e2e run against the live deploy; CWV/CLS probing; VLM + geometry parity re-audit vs the source; docs/hygiene alignment audit post-`50c357f` | RED→GREEN: root loading boundary removed (ADR-012 — CLS 0.31→0.0000 via gap-proxy harness, soft-404 200→404), `dynamicParams=false`, CSP + CF analytics origin, playwright-core dedupe (typecheck covers e2e again), git hygiene (db/custom.db/.env/package-lock untracked), SSH push tooling; 52 unit + 83 e2e green — see `docs/REMEDIATION_PLAN.md` § Pass 3 |
 | Pass 3 — tiered code review + security audit (2nd cycle, TDD) | 2026-09-14 | Six-Axis review of all sources + OWASP-style probes (methods, malformed/oversized bodies, rate-limit spoofing, secret/key scans, dep audit) — `docs/AUDIT_CODE_REVIEW.md` § Pass 3 | 0 Critical; AUD-1 rate-limit client-key hardened (cf-connecting-ip → last XFF hop; 10 new unit tests, 62/62) ; AUD-2 PII posture docs corrected; AUD-3 deepmerge-ts accepted-risk recorded (CLI-only transitive); safe-to-ship verdict |
 | Pass 4 — second live-site validation + remediation (TDD) | 2026-09-14 | Full e2e suite re-run against the live deploy (redeployed with pass-3 code: hard-404 + CLS 0.0000 + CSP beacon verified live); VLM pairwise + DOM + geometry parity re-audit vs the source site; deploy-state probes (email obfuscation, robots, console/hydration errors) | RED→GREEN: rate-limit isolation specs made environment-aware (P4-F1 — `classifyBurstStatuses` classifier, 9 new unit tests → 71/71; live runs skip loudly with evidence, local runs keep full-strength assertions, re-runs inside the 10-min window stay green); `scripts/live-deploy-audit.mjs` post-deploy state gate (P4-F2 — 6/6 local, 5/6 live with the email-obfuscation dashboard toggle as the one open operator action); CF Managed robots.txt preamble documented; parity verdict re-confirmed HIGH — see `docs/REMEDIATION_PLAN.md` § Pass 4 |
+| Pass 5 — third live-site validation + remediation (2026-09-14) | 2026-09-14 | Full gate at post-pass-4 baseline; live e2e re-run (80 pass + 3 loud skips, 0 fail; contact re-run 6 skips — idempotent); third consecutive VLM+DOM+geometry parity audit vs the source (HIGH, all flags refuted); contract-drift + git-hygiene scan | P5-F1 HIGH git hygiene: `db/custom.db` re-tracked by operator session-log commits → untracked again (synthetic e2e fixtures only, no real PII; history intact, AGENTS.md caution added); README/SKILL count drift realigned (62→71, 5-of-10→5-of-11, 3,233→3,611); parity record § Pass 5 appended — see `docs/REMEDIATION_PLAN.md` § Pass 5 |
+| Pass 5 — tiered code review + security audit (3rd cycle) | 2026-09-14 | Tier 0 contracts 5/5 MATCH; Tier 1 mechanical + scans; Tier 2 Six-Axis full-source review; Tier 3 runtime probes (methods 405, 2.5 MB body, rate-limit keying, reflection, servable secrets, control chars, unicode) — `docs/AUDIT_CODE_REVIEW.md` § Pass 5 | 0 Critical/High runtime defects; AUD5-F1 Medium — seven dead car-care reference scripts removed from `scripts/` (one hangs on `npm test` in this bun repo); AUD5-F2 keepers documented in PAD §11; safe-to-ship verdict; 71/71 + 83/83 re-verified green |
 
 ## Appendix C: Post-Deploy Live-Site Validation
 
@@ -1594,7 +1596,7 @@ manual by design.
 7. **The reference script** — `/home/z/my-project/scripts/smoke_test.sh`
    automates 2–6 and lands artifacts in `/home/z/my-project/tool-results/dbs/`.
 
-*End of skill document (v2.3.0). Produced by the six-phase distillation
+*End of skill document (v2.4.0). Produced by the six-phase distillation
 process; every claim is checkable against the repository. History: v1.0.0
 distilled the codebase at `f014842`; v2.0.0 adds remediation-pass-1
 knowledge (ADR-007/008, lessons L9–L12, resolved findings, audit history);
@@ -1603,4 +1605,6 @@ v2.2.0 adds ADR-011/012, the pass-3 live-site validation + remediation
 (lessons L14–L15), the CLS harness, and the SSH push tooling; v2.3.0 adds
 the pass-4 environment-aware e2e semantics (P4-F1, `classifyBurstStatuses`,
 lesson L16) and the post-deploy state gate `scripts/live-deploy-audit.mjs`
-(P4-F2).*
+(P4-F2); v2.4.0 adds the pass-5 live re-validation (third consecutive HIGH
+parity verdict), the db/custom.db re-tracking fix + AGENTS caution, count
+realignments, and the dead-car-care-tooling removal (AUD5-F1).*

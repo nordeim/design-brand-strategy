@@ -239,3 +239,80 @@ Non-blocking nit: `live-deploy-audit.mjs`'s CLS check would report 0.0000 for a 
 1. **R4-1 (T0-1/2/3, docs):** realign `Project_Architecture_Document.md` — 62→71 tests, qualify the ADR-009 XFF claim with the P4-F1 edge-fronted behavior, add `classifyBurstStatuses` + `scripts/live-deploy-audit.mjs` to the testing/tooling inventory.
 2. **R4-2 (docs):** SKILL.md §11 pre-ship checklist + Appendix C gain the post-deploy step "run `scripts/live-deploy-audit.mjs` against the live origin" so the deploy gate is discoverable from the shipping checklist.
 3. **R4-3 (optional, defer):** dead-page guard in `live-deploy-audit.mjs` CLS check (verify the navigation produced a non-empty DOM before scoring CLS). Low value while checks 1–5 gate origin liveness; deferred with rationale.
+
+---
+
+# Pass 5 — Tiered Code Review + Security Audit (2026-09-14, fifth session)
+
+**Scope:** prove the codebase matches its documented contracts (AGENTS/CLAUDE/README/SKILL/PAD) and is safe to ship, at the post-pass-4 baseline (`3c38b8b`) plus this session's remediation-round-1 changes. Rubrics per `skills/skills-catalog.md`: `code-quality-standards` (Six-Axis), `security-and-hardening`, `vulnerability-scanner` (OWASP 2025), `code-review-checklist`, `verification-and-review-protocol` (Iron Law — every claim below carries fresh evidence). `skills/` excluded from checking/testing/compilation throughout.
+
+## Tier 0 — Documented contracts: **MATCH (5/5)**
+
+| Contract | Verification | Verdict |
+|---|---|---|
+| AGENTS.md | Commands table ↔ `package.json` scripts (all 13 present); e2e description ↔ `playwright.config.ts` (serial, chromium+Pixel-7, :3002, `E2E_BASE_URL` override); gotchas verified in code (no root `loading.tsx`, `dynamicParams=false`, bun.lock canonical, `git ls-files db/` empty post-P5-fix); CI gate exists and runs the documented set on every push (no branch filter) | MATCH |
+| CLAUDE.md | Test-strategy counts (71 unit / 8 files) match the executed suite; env-var table matches `.env.example` + `src/data/site.ts` fallback chain; five-client-component rule verified (`use client` = 5 components + `error.tsx` boundary, documented) | MATCH |
+| README.md | Post-remediation-round-1 state: unit count 71 (was stale at 62 — fixed as P5-F2); key features verified (19 WebP images, 8 SSG case studies, 13-URL sitemap, native `<details>` FAQ); deployment notes match live behavior (CF beacon allowance, robots preamble, obfuscation warning) | MATCH (after round-1 fix) |
+| SKILL.md v2.3.0 | Post-round-1 self-consistent ("5 of 11" components, 3,611 lines / 33 files — both re-measured); token table transcribes `globals.css` exactly; ADR table matches the twelve decisions verified in code (ADR-005 seeded LCG, ADR-007 dual CSS guards pinned by `reveal-guard.test.ts`, ADR-011 schema, ADR-012 no boundary) | MATCH (after round-1 fix) |
+| PAD | Pass-4 realignment holds: test-distribution table current, ADR-009 amendment present, tooling inventory lists exactly the four live tools (`db.ts`, `cls-regression.mjs`, `gap-proxy.mjs`, `live-deploy-audit.mjs`); known-issues §10 carries the email-obfuscation operator row | MATCH |
+
+## Tier 1 — Mechanical gates + structural invariants + scans: **ALL GREEN, one finding**
+
+- Full gate re-run this session: lint ✓ · typecheck (covers e2e + scripts) ✓ · 71/71 unit ✓ · build 20 routes ✓ · 83/83 e2e local (zero skips) ✓ · `cls-regression.mjs` worst 0.0000 ×3 ✓.
+- Structural invariants: upward imports 0 (`from "@/app` in components/lib/data → empty); `rounded-(lg|xl|2xl|md)` 0; `shadow` 0; raw colors in components 0; `any` 0; eslint/ts suppressions 0; `dangerouslySetInnerHTML` exactly 1 (the sanctioned static theme script, no user input).
+- Secret scan: clean — the only "key material" strings are `[REDACTED:ssh_private_key]` placeholders in the push docs; no tracked `.env`/`.db` after the P5-F1 untrack (`git ls-files db/` → empty).
+- `bun audit`: exactly the one documented accepted risk (AUD-3: `deepmerge-ts <8.0.0` HIGH, transitive CLI-only via `prisma → @prisma/config`; runtime `@prisma/client` is zero-dep) — unchanged since pass 3.
+
+**Finding AUD5-F1 (Medium — dead reference-project tooling):** `scripts/` ships six provably dead car-care-reference scripts plus one unrunnable one-shot. Evidence (per file):
+
+| File | Evidence it is car-care reference material |
+|---|---|
+| `skill-verify.sh` | Header: "verification gate for **car-care_SKILL.md** claims" (target file does not exist in this repo); checks car-care deps (`zod@4.6.4`, `zustand`, `sonner`, `embla-carousel-react`, `sharp@0.35.4` — none in this repo); expects `src/components/wcc/` (16 files) and `src/data/wcc/content.ts`; check #2 runs `npm test` (this is a bun repo — the script **hangs**, verified: killed at 120 s); check #11 expects a CI timezone matrix this repo does not have |
+| `vlm-parity-audit.mjs` | "compares … against the source site (**wecarecarcare.com**)" with car-care section pairs (ceramic hydrophobic demo, pricing packages, interior-only…) |
+| `vlm-audit-pass2.mjs` | BASE = `tool-results/visual-audit-2026-09-13` (car-care audit dir, absent here); describes "DARK-THEME REDESIGN" divergence — the car-care project's narrative, not this site's |
+| `vlm-check.mjs` | Hardcoded sandbox path `/home/z/my-project/tool-results/verify-pricing.png` (car-care artifact) |
+| `hero-variants.mjs` | SRC = `/home/z/my-project/public/images/hero-car.webp` (nonexistent in this repo) |
+| `gen-images.sh` | "Generate **We Care Car Care** site imagery" |
+| `optimize-images.mjs` | Hardcoded `/home/z/my-project/public/images` (not repo-relative) **and** requires `sharp`, which is not a dependency — unrunnable from a fresh clone (its one-shot job, the committed WebP set, is complete) |
+
+None of the seven is referenced by `package.json`, CI, or any contract doc (the pass-4 audit note mentions `skill-verify.sh` only as a secret-scan false-positive, not as tooling). Risk: a future agent executing `skill-verify.sh` hangs or "remediates" the repo toward car-care expectations; the files ship misleading content in a public repo. The three generic scripts (`vlm-audit.mjs`, `capture-sections.sh`, `contrast-check.mjs`) are arg-driven and harmless but undocumented (AUD5-F2, Info).
+
+## Tier 2 — Six-Axis source review: **Approve (no new code defects)**
+
+All 33 non-test source files, 8 test files, 7 e2e specs, 5 configs, prisma schema, and the four live scripts were read this pass. Per axis:
+
+1. **Correctness** — estimator math fail-fast (`RangeError` on unknown ids, UI emits only table ids); `?service=` preselect validated against `ESTIMATOR_SERVICES` before the cast; sitemap `lastmod` deterministic (`SITE.contentUpdatedAt`); marquee duplicate half `aria-hidden` with `alt=""`; rate limiter bounded (sweep-at-cap) with the AUD-1 trust order and P4-F1 classifier exactly as documented.
+2. **Readability** — single-render-path estimator (`OPTION_SETS`); colocated enum+label maps; comments explain why (fail-open DB, CSP allowance, seed arithmetic in tests); no dead code in `src/`.
+3. **Architecture** — layer greps empty (downward-only holds); the one sanctioned boundary exception (`api/contact/route.ts` importing `@/lib/contact`) documented; content-as-code honored (components render data, no prose).
+4. **Security** — zod validation at the boundary with per-field 400s; Prisma parameterized writes; no input reflection in any response; honeypot client-side (documented); PII-aware logging (message body never logged — length only); headers complete; health `no-store`.
+5. **Performance** — SSG everywhere possible (20 routes, 5 dynamic); single insert per inquiry (no N+1 surface); memoized estimate; images pre-encoded WebP with explicit dimensions (no optimizer dependency).
+6. **Aesthetic/UX rigor** — the parity audit (Pass 5 record in `docs/AUDIT_VISUAL_PARITY.md`) re-verified HIGH fidelity with every VLM flag DOM-refuted; the anti-generic invariants hold mechanically (no rounded-lg/shadows/palette colors/gradients).
+
+## Tier 3 — Runtime security probes (local production server, `next start` :3005)
+
+| Probe | Result |
+|---|---|
+| Method discipline (`GET/PUT/DELETE/PATCH` on `/api/contact`) | 405 ×4 ✓ |
+| 2.5 MB body | clean 400 ✓ |
+| Same-key XFF burst (6 requests) | `[202,202,202,202,202,429]` — AUD-1 isolated keying ✓ |
+| Fresh `cf-connecting-ip` after another key's burst | isolated 202 ✓ |
+| Forged multi-hop XFF | keyed on last hop (fresh → 202) ✓ |
+| XSS payload in fields | response is the fixed message only — no reflection; stored value has no rendering surface (no inquiry UI; React escaping if ever rendered) ✓ |
+| Web-servable secrets (`/db/custom.db`, `/.env`, traversal) | 404 ✓ |
+| Control-char header | graceful 202 ✓ |
+| Health caching | `no-store` ✓ |
+| Unicode | Cyrillic names accepted (202); non-ASCII email local parts rejected by zod `.email()` — standard validator behavior (SMTPUTF8 addresses), informational (AUD5-F3) |
+
+Two probe expectations were miscalibrated on first run and re-verified as correct behavior (script-tag name passes the min-2 schema — the payload is inert and unreflected; the 400 above came from the email field, not the name). No defect found.
+
+## Verdict
+
+**Safe to ship.** Zero Critical/High findings in runtime code. One Medium maintainability finding (AUD5-F1 — dead car-care tooling in `scripts/`), one informational tooling note (AUD5-F2), one accepted email-validation limitation (AUD5-F3), and two carried operator-side items (email-obfuscation dashboard toggle; deepmerge-ts accepted risk). The remediation backlog below feeds remediation plan #2 (`docs/REMEDIATION_PLAN.md` § Pass 5, second cycle).
+
+## Remediation backlog (second cycle of pass 5)
+
+| # | Item | Sev | Action |
+|---|---|---|---|
+| 1 | Delete the seven dead/unrunnable car-care scripts (`skill-verify.sh`, `vlm-parity-audit.mjs`, `vlm-audit-pass2.mjs`, `vlm-check.mjs`, `hero-variants.mjs`, `gen-images.sh`, `optimize-images.mjs`) | Medium | One atomic `chore:` commit; the git history preserves them |
+| 2 | Document the three retained generic scripts in the PAD tooling inventory (external-tool requirements: z-ai SDK / agent-browser CLI) | Info | PAD table addition |
+| 3 | Email-obfuscation toggle + delivery-hook wiring | Info | Operator actions (standing) |

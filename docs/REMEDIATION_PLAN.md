@@ -414,3 +414,146 @@ Driven by `docs/AUDIT_CODE_REVIEW.md` § Pass 4 (tiered review + security audit 
 | R4-1 | PAD: test count 62→71 with the classifier named; ADR-009 rationale qualified (self-managed vs edge-fronted origins, `classifyBurstStatuses`, loud skips); tooling inventory adds the deploy-audit script | `rg "62 tests" Project_Architecture_Document.md` → no hits; new claims match `package.json`/`src/lib/rate-limit.ts`/`scripts/` reality |
 | R4-2 | SKILL §11 + Appendix C gain the post-deploy audit step | SKILL change log v2.3.0 already describes the script; checklist now points to it |
 | Final gate | lint · typecheck · 71/71 unit · build 20 routes · 83/83 e2e local · live suite green (skips loud) · `rg` drift re-scan clean | All green post-change |
+
+# Pass 5 — Remediation Plan: Live-Deploy E2E + Parity Validation (2026-09-14)
+
+**Date:** 2026-09-14 (fifth session; prompt `docs/prompt-to-review-3.md`)
+**Inputs:** Full gate re-run at the post-pass-4 baseline (`3c38b8b`), full e2e suite against the live deploy (`E2E_BASE_URL=https://design-brand-strategy.jesspete.shop`, chromium + Pixel-7), `scripts/live-deploy-audit.mjs`, VLM pairwise + DOM + geometry parity re-audit vs the source site (`https://editorial-portfolio-9d8e325b.lovable.app/`), contract-drift scan across the five contract docs, git-hygiene scan of tracked files.
+**Method:** planned per `skills/planning-and-task-breakdown`; remediation follows the TDD policy of `skills/tdd` / `skills/test-driven-development` — no runtime-code defect was found this pass, so there is no RED→GREEN code seam; the equivalent GREEN condition for each fix is stated per item (grep re-scan / git-state assertion / full mechanical gate).
+**Branch policy:** all work on `main` (operator contract — no new branches). Conventional Commits, atomic slices.
+
+## 1. Findings
+
+| ID | Sev | Finding | Evidence |
+|---|---|---|---|
+| P5-F1 | **High (git hygiene)** | `db/custom.db` is **tracked at HEAD** — re-added by the operator's "update session log" commits (`de63134`, then updated by `3c38b8b`) after remediation pass 3 had untracked it. This violates the `.gitignore` rule `/db/*.db` ("runtime sqlite database (contains customer PII — never commit)") and the AGENTS.md gotcha ("keep it out"). Mitigating fact, verified by inspecting the committed blob: every record is the synthetic e2e fixture (`Jordan Lee / jordan@example.com`, `e2e/contact.spec.ts:25`) — no real customer PII, so not Critical; but the tracked file re-opens the exact leak channel pass 3 closed. | `git ls-files db/` → `db/custom.db`; `git show HEAD:db/custom.db \| strings` → repeated Jordan-Lee fixture rows; `.gitignore` line `/db/*.db` |
+| P5-F2 | Medium (docs drift) | README.md (the public face) still carries the pre-pass-4 unit-test count: "62 unit tests" in the key-features table and "Tests 62 passed (62)" in the verify-setup block. CLAUDE.md, the PAD, and the SKILL are all at 71 — README is the only straggler, so the public contract contradicts the working contracts. | `bun run test` → `Tests 71 passed (71)`; README lines 31 and 131 |
+| P5-F3 | Low (docs drift) | SKILL.md §2 tech-stack table says "only 5 of 10 `src/components` files are `"use client"`" — there are **11** component files (SKILL §5.2 itself correctly says "all 11 files"). Internal inconsistency inside one contract doc. | `ls src/components/*.tsx \| wc -l` → 11; 5 of them carry `"use client"` |
+| P5-F4 | Low (docs drift) | SKILL.md §2 repo facts: "3,233 lines of TS/TSX/CSS across 33 source files" — the 33-file count is still exact, but the line count is stale: **3,611** non-test lines after the pass-3/4 additions (rate-limit classifier, CSP header work, etc.). | `wc -l` over non-test `src/` TS/TSX/CSS files |
+| P5-F5 | Info (operator action) | Cloudflare Email Address Obfuscation is STILL ON (2 `/cdn-cgi/l/email-protection` rewrites in live `/contact` HTML) — the standing dashboard action from pass 4. No code fix exists; `scripts/live-deploy-audit.mjs` fails this check loudly until the toggle is flipped. | `bun scripts/live-deploy-audit.mjs` → 5/6, FAIL email-obfuscation with fix hint |
+| P5-F6 | Info | `.gitignore` carries a `/skills/` entry that is inert (skills/ was deliberately force-tracked in `50c357f "add skills"` and is part of the repo by operator design). Cosmetic inconsistency only — left as-is; new files under `skills/` are intentionally invisible to `git status`. | `git ls-files skills/ \| wc -l` → 2,47x files tracked despite the ignore line |
+
+**Non-findings (verified clean, no action):** full local gate at baseline (lint, typecheck, 71/71 unit / 8 files, build 20 routes, 83/83 e2e with zero skips); local CLS harness worst 0.0000 ×3; live e2e 80 passed + 3 skipped (loud, evidence-bearing — P4-F1 semantics hold) with 0 failures, and the contact-only immediate re-run skipped 6 specs green (idempotent inside the 10-min window, exactly as designed); live health, full security-header set, hard-404, robots (CF managed-content preamble + intact app directives), cold-load CLS 0.0000 ×2, absolute sitemap URLs, FCP 612 ms / LCP 300–612 ms; work-grid aspect rhythm byte-identical to source (`[1.6, 0.8]×4`); 0 console/page errors on both sites; VLM pairwise HIGH on all 6 surfaces with every flagged gap DOM-refuted as a misread (marquee present with 26 images; /work CTA + heading sub-text present; Beyond-Work is a 3×389 px column grid; footer Connect column exists on BOTH sites; 7 italic sub-heads + Best-For + Investment present on /services; estimator sub-headline present; Send-inquiry CTA is `rounded-full`; footer socials render as a list). The FAQ remains native `<details>` — documented deliberate divergence (README key features), not a defect.
+
+## 2. Design decisions
+
+### D1 — Untrack the DB at HEAD, keep history intact (P5-F1)
+`git rm --cached db/custom.db` (file stays on disk for the local runtime; `.gitignore` already covers it, so it cannot reappear via `git add .`). History rewrite (filter-repo) is **rejected**: the exposed blob contains only synthetic e2e fixtures (verified above), and the operator contract forbids force-pushes/branch games; the marginal benefit does not justify destroying the audit trail. A caution note is added to AGENTS.md so future "update session log"-style commits (`git add -A` after tooling resets) do not silently re-track it — this is the actual regression mechanism that re-opened the channel between passes 3 and 4.
+
+**Regression-test consideration (TDD policy):** a vitest guard was evaluated and rejected — the repo's test conventions pin pure functions and source-reading assertions (no environment coupling), a `git ls-files` shell-out from vitest couples unit tests to VCS state (and passes vacuously in CI's fresh clone), and the failure mode is operator workflow, not code. The enforced guard is instead the pre-ship checklist gate 9 (git gates) plus the AGENTS.md caution — both extended in this pass.
+
+### D2 — README count realignment (P5-F2)
+Two surgical edits: key-features table "62 unit tests" → "71 unit tests"; verify-setup block "Tests 62 passed (62)" → "Tests 71 passed (71)". No other claims in README drift (83 e2e count, 20 routes, 19 images, 11 components all verified current).
+
+### D3 — SKILL §2 self-consistency (P5-F3, P5-F4)
+"5 of 10" → "5 of 11"; "3,233 lines" → "3,611 lines" (33 source files stays — still exact). These are the same class of surgical drift fix as pass-4's R4-1.
+
+### D4 — Records (this plan, parity record, session log)
+`docs/AUDIT_VISUAL_PARITY.md` gains the Pass-5 re-validation record (HIGH verdict + refutation table). At session close, `docs/session_4.md` is written as the clean condensed session record (the session_2.md format); operator-committed raw transcripts (`docs/session_1.md`, `docs/session_3.md`) are left untouched by design.
+
+## 3. ToDo list (execution order)
+
+| # | Task | Files | GREEN condition |
+|---|---|---|---|
+| 1 | Untrack the DB at HEAD + operator caution | git index; `AGENTS.md` (gotcha extended) | `git ls-files db/` → empty; `git status` shows db/custom.db untracked/ignored; AGENTS.md names the `git add -A` hazard |
+| 2 | README test-count realignment | `README.md` ×2 lines | `rg "62" README.md` → no unit-test hits; only claims 71 |
+| 3 | SKILL §2 consistency | `design-brand-strategy_SKILL.md` ×2 spots | `rg "5 of 10\|3,233" design-brand-strategy_SKILL.md` → no hits |
+| 4 | Parity record | `docs/AUDIT_VISUAL_PARITY.md` | § Pass 5 present with evidence table |
+| 5 | Full mechanical gate re-run | — | lint · typecheck · 71/71 unit · build 20 routes · 83/83 e2e local — all green (docs/manifest changes must not disturb the gate) |
+| 6 | Session record (at close) | `docs/session_4.md` | Present, session_2.md format |
+
+## 4. Validation against the codebase (pre-execution — all verified)
+
+1. `git ls-files db/` currently returns `db/custom.db` (the RED state for task 1); `.gitignore` already contains `/db/*.db`, so untracking is the only missing half. `git rm --cached` on a tracked-but-ignored file leaves the working tree intact (verified semantics; no `--force` needed since the file is not modified in the index).
+2. README line 31 ("62 unit tests") and line 131 ("Tests 62 passed (62)") are the only two unit-count occurrences in the file (`rg -n "62" README.md` → exactly these two, plus the unrelated badge/version strings — re-checked by hand).
+3. SKILL §2's "5 of 10" appears once (line 163); §5.2's "all 11 files" (line 436) is the correct anchor. "3,233" appears once (line 198). Non-test src line count re-measured: 3,611 across 33 files.
+4. No code file changes in this cycle → the full mechanical gate is expected to be byte-identical to the baseline run (any deviation is a red flag, not noise).
+5. AGENTS.md gotcha currently reads "…it was force-committed once and untracked in remediation pass 3; keep it out." — the extension (naming the operator-side `git add -A` re-tracking mechanism, observed twice in `de63134`/`3c38b8b`) is additive and factual.
+
+## 5. Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Untracking the DB looks like "losing" the DB to the operator | The file remains on disk untouched; only the git index drops it. Called out in the session record + commit body. |
+| History still contains the fixture DB blob | Verified synthetic-only (no real PII); documented here; history rewrite explicitly rejected (audit trail > cosmetic purge, and force-push is contract-forbidden). |
+| Doc edits accidentally touch live claims beyond the two stale spots | Surgical single-string edits with unique anchors; post-edit `rg` re-scan proves no stale claims remain and no new ones introduced. |
+| Gate regression from manifest-adjacent changes | Task 5 re-runs the full gate; expectation is identical output to baseline (71/71, 83/83, 20 routes). |
+
+## Execution record (2026-09-14)
+
+| Step | Change | Verification (GREEN evidence) |
+|---|---|---|
+| 1 | `git rm --cached db/custom.db`; AGENTS.md gotcha extended with the operator-side re-tracking mechanism + pre-push check (`git ls-files db/`) | `git ls-files db/` → empty; file intact on disk (28,672 B); `git status` shows the staged deletion only |
+| 2 | README: "62 unit tests" → "71 unit tests" (key features); "Tests 62 passed (62)" → "Tests 71 passed (71)" (verify setup) | `rg "62 unit\|Tests 62" README.md` → 0 hits |
+| 3 | SKILL §2: "5 of 10" → "5 of 11"; "3,233 lines" → "3,611 lines … (plus 8 co-located test files)" | `rg "5 of 10\|3,233" design-brand-strategy_SKILL.md` → 0 hits |
+| 4 | `docs/AUDIT_VISUAL_PARITY.md` § Pass 5 appended (HIGH verdict, full refutation table, artifacts pointer) | Section present (194-line file, tail check) |
+| 5 | Full mechanical gate re-run | lint ✓ · typecheck ✓ · 71/71 unit ✓ · build 20 routes ✓ · 83/83 e2e local (zero skips) ✓ — identical to baseline, as required for docs-only changes |
+| 6 | Session record | `docs/session_4.md` at session close (see final phase) |
+
+**Deferred with rationale:** none this pass — every planned item executed. P5-F5 (email-obfuscation toggle) and P5-F6 (inert `/skills/` ignore line) remain operator-side/informational by design.
+
+# Pass 5 — Second Remediation Cycle: Dead-Tooling Removal + Docs (2026-09-14)
+
+**Inputs:** Pass-5 tiered audit (`docs/AUDIT_CODE_REVIEW.md` § Pass 5) — verdict safe-to-ship with one Medium maintainability finding (AUD5-F1) and two informational notes (AUD5-F2/F3).
+**Method:** planned per `skills/planning-and-task-breakdown`; TDD policy applies to code changes — this cycle contains **no runtime-code change** (file deletions of unreferenced scripts + documentation), so there is no RED→GREEN seam; each task states its GREEN condition explicitly (git state / grep re-scan / full mechanical gate), mirroring the pass-4 second-cycle protocol.
+**Branch policy:** all on `main`, atomic commits.
+
+## 1. Findings (from the audit)
+
+| ID | Sev | Finding |
+|---|---|---|
+| AUD5-F1 | Medium (maintainability) | Seven dead reference-project scripts in `scripts/` (evidence table in the audit report): `skill-verify.sh` (targets nonexistent `car-care_SKILL.md`, checks car-care deps, **hangs** on `npm test` in this bun repo), `vlm-parity-audit.mjs` (hardcoded `wecarecarcare.com`), `vlm-audit-pass2.mjs` (car-care audit dir + dark-theme-redesign narrative), `vlm-check.mjs` (hardcoded sandbox path to a car-care screenshot), `hero-variants.mjs` (references nonexistent `hero-car.webp`), `gen-images.sh` ("We Care Car Care site imagery"), `optimize-images.mjs` (hardcoded sandbox path; requires `sharp`, not a dependency — unrunnable from a fresh clone). None referenced by `package.json`, CI, or docs. |
+| AUD5-F2 | Info | The three retained generic scripts (`vlm-audit.mjs`, `capture-sections.sh`, `contrast-check.mjs`) are undocumented in the PAD; they depend on external sandbox tooling (z-ai-web-dev-sdk / agent-browser CLI), not repo dependencies. |
+| AUD5-F3 | Info | Non-ASCII email local parts rejected by zod `.email()` — standard validator behavior; accepted limitation. |
+| (carried) | Info | CF email-obfuscation toggle + `contact_inquiry` delivery-hook wiring — standing operator actions. |
+
+## 2. Design decisions
+
+### D1 — Delete the seven dead scripts (AUD5-F1)
+`git rm` the seven files in one atomic commit. Rationale: they are provably for a different project (headers, targets, and dependencies all reference car-care artifacts that do not exist here), one of them **hangs** when executed (`skill-verify.sh` → `npm test`), and they ship misleading content in a public repo. The git history preserves them if ever needed; the initial-build WebP pipeline (`optimize-images.mjs`) completed its job (19 committed WebP assets). The repo's own standards demand this ("no temporary or intermediate files in final output locations"; dead-code hygiene in SKILL §13/§16 and CLAUDE.md).
+
+**Regression-test consideration (TDD policy):** a unit test asserting the absence of specific files couples vitest to the filesystem and adds no protection beyond the deletion itself plus CI (the files cannot re-enter without a deliberate `git add`). The enforced guard is the audit itself plus this record — same reasoning as pass-4's R4-3 deferral.
+
+### D2 — Document the retained scripts (AUD5-F2)
+Add the three keepers to the PAD §11 Key Files Reference area with one line each, naming their external-tool requirements, so the tooling inventory matches reality (the audit's Tier-0 standard).
+
+### D3 — Docs round 2
+SKILL.md: version bump to v2.4.0 + change-log line + Appendix B row for pass 5 (audit + both remediation cycles). AGENTS.md/CLAUDE.md/README.md: no changes required (no behavior/tooling contract they document is altered — the deleted scripts were never documented). Session record `docs/session_4.md` written at session close (session_2.md format).
+
+## 3. ToDo list (execution order)
+
+| # | Task | Files | GREEN condition |
+|---|---|---|---|
+| 1 | Delete the seven dead scripts | `scripts/{skill-verify.sh, vlm-parity-audit.mjs, vlm-audit-pass2.mjs, vlm-check.mjs, hero-variants.mjs, gen-images.sh, optimize-images.mjs}` | `git status` shows exactly 7 deletions; `ls scripts/` = 7 remaining files (4 documented + 3 keepers); no reference breaks |
+| 2 | PAD tooling inventory addition | `Project_Architecture_Document.md` | The three keepers appear with external-tool notes |
+| 3 | SKILL v2.4.0 (change log + Appendix B row) | `design-brand-strategy_SKILL.md` | Version header + history line + Appendix B pass-5 row present |
+| 4 | Full mechanical gate re-run | — | lint · typecheck · 71/71 unit · build 20 routes · 83/83 e2e — identical to baseline |
+| 5 | Session record | `docs/session_4.md` | Present, session_2.md format |
+
+## 4. Validation against the codebase (pre-execution — all verified)
+
+1. Reference scan for the seven filenames across `package.json`, `.github/workflows/verify-gate.yml`, `README.md`, `CLAUDE.md`, `AGENTS.md`, SKILL, PAD, and `docs/`: **zero references** (the only mentions are the audit-history records in `docs/AUDIT_CODE_REVIEW.md` § Pass 4/5 — archival prose, not tooling references).
+2. `tsc --noEmit` does not type-check `.mjs`/`.sh` (tsconfig includes `**/*.ts`/`**/*.tsx` only; `scripts/db.ts` stays); the current lint passes *with* the files present, so deletion cannot introduce a lint failure.
+3. The PAD §11 Key Files table is the established inventory home (it already lists `scripts/` tools via §7.1's tooling table and ADR mentions); adding three keeper lines is additive.
+4. SKILL version history lives in the footer (v1.0.0 → v2.3.0 chain) and Appendix B is the audit ledger — both expect a new row per pass.
+5. No `.env`, lockfile, or dependency changes — the mechanical gate is expected to be byte-identical to the post-round-1 run.
+
+## 5. Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| A deleted script was secretly used by the operator's local workflow | The seven are car-care-specific by their own contents (targets/deps/paths that do not exist in this repo) — they cannot have been part of a working DBS workflow; history preserves them regardless. |
+| Losing the WebP pipeline | Its output (19 WebP files) is committed; the script itself cannot run here (no `sharp` dep). If imagery is ever regenerated, the script is one `git show` away. |
+| Doc edits drift | Surgical single-anchor edits + post-edit re-scans; full gate re-run proves no code impact. |
+
+## Execution record (second cycle, 2026-09-14)
+
+| Step | Change | Verification (GREEN evidence) |
+|---|---|---|
+| 1 | `git rm` × 7 dead scripts (`skill-verify.sh`, `vlm-parity-audit.mjs`, `vlm-audit-pass2.mjs`, `vlm-check.mjs`, `hero-variants.mjs`, `gen-images.sh`, `optimize-images.mjs`) | `ls scripts/` → exactly 7 remaining (4 documented + 3 keepers); reference scan still zero; git status shows exactly the 7 staged deletions |
+| 2 | PAD §11 gains the scripts-inventory paragraph (4 operational tools + 3 sandbox-session keepers with external-tool requirements + removal note) | Paragraph present; every named file exists |
+| 3 | SKILL v2.4.0: header/project_state/Appendix B rows ×2 (pass-5 validation + pass-5 audit)/footer history | Version line 2.4.0; rows present; history chain extended |
+| 4 | Full mechanical gate re-run | lint ✓ · typecheck ✓ · 71/71 unit ✓ · build 20/20 routes ✓ · 83/83 e2e ✓ — byte-identical to the post-round-1 baseline, as required for deletion/docs-only changes |
+| 5 | Session record | `docs/session_4.md` (session_2.md format) at session close |
+
+**Deferred with rationale:** AUD5-F3 (non-ASCII email local parts) — standard zod `.email()` behavior, accepted; operator items (email-obfuscation toggle, delivery hook) — outside code scope by definition.

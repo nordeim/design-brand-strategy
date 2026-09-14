@@ -167,3 +167,28 @@ Regression guards: every fixed finding is pinned by a named Playwright spec (`e2
 **Verdict:** parity re-confirmed **HIGH design-language fidelity** on the live deploy. All VLM-flagged structural gaps were DOM-refuted misreads; no actionable visual findings. VLM utility note re-confirmed (L13): VLM verdicts are triage — numbers and DOM probes are the contract.
 
 Artifacts: `/home/z/my-project/tool-results/parity-pass4/` (11 source + 7 live screenshots, geometry JSON, VLM results).
+
+---
+
+## Pass 5 — Live-Deploy Parity Re-Validation (2026-09-14, fifth session, post-pass-4 baseline `3c38b8b`)
+
+**Context:** full gate re-verified green at the post-pass-4 baseline (71/71 unit, 83/83 e2e local with zero skips, build 20 routes); live deploy confirmed healthy (health, full security-header set, hard-404, robots with the documented CF managed-content preamble, cold-load CLS 0.0000 ×2, FCP 612 ms / LCP 300–612 ms, zero console/page errors). This pass re-runs the parity audit on the same live artifact to confirm the post-pass-4 state holds and to catch any drift since pass 4.
+
+**Method (unchanged, lesson L13):** Playwright capture with scroll-through on both sites → 6 aligned full-page screenshots → VLM pairwise (`z-ai vision`, SOURCE=image 1 / LIVE=image 2, FIDELITY/GAPS/VERDICT) → **every flagged gap DOM-verified before acceptance** → geometry probes.
+
+**Results:**
+
+| Surface | VLM verdict | VLM-flagged gaps → DOM verification |
+|---|---|---|
+| Home | high | "omits the marquee strip + 'Considered by Design' editorial block" → marquee present (26 imgs) and editorial feature sections present ("A studio of one, built for considered work." / "What I do" / "Let's build something considered.") — misread |
+| /work | high | "missing 'Start a conversation' CTA + heading sub-text" → both present (CTA link found; sub-text "A selection of engagements from the last four years — each one a system built to outlast the project") — misread |
+| /about | high | "'Beyond Work' 3-col in source vs 2-col local" → local renders Teaching/Mentoring/Speaking as a 3-column grid (3 × 389 px at x=88/525/963) — misread; "footer Connect column absent from source" → the source footer contains the same NAVIGATION + CONNECT column (probed) — misread |
+| /services | high | "omits italic sub-headlines + Best For/Investment split-line" → 7 italic elements, Best-For and Investment text present — misread; "standard FAQ accordion vs reference's expanded list" → real but documented deliberate divergence (native `<details>`, zero JS — README key features) |
+| /contact | high | "estimator lacks centered sub-headline / '0/4 selections' status" → sub-headline present ("Get a personalized estimate. Answer a few questions…", identical header text probed on source); no such counter found on the source either — misread; "CTA rectangular instead of pill" → Send-inquiry button is `rounded-full` (computed radius = full) — misread; "footer socials inline vs vertical" → three socials render as list rows (probed) — misread |
+| /work/meridian (case study) | high | "none" |
+
+**Geometry probes:** /work cover rhythm byte-identical to source (`[1.6, 0.8] ×4` on both, measured independently this pass); home hero/grid images within the documented rhythm; 0 console/page errors on either site.
+
+**Verdict:** parity re-confirmed **HIGH design-language fidelity** — third consecutive live-artifact validation with every VLM-flagged structural gap DOM-refuted. VLM utility note (L13) holds: VLM verdicts are triage; numbers and DOM probes are the contract.
+
+Artifacts: `/home/z/my-project/tool-results/parity/` (6 source + 6 live screenshots, geometry JSON per site, VLM results at `vlm-results.txt`).

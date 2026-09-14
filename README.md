@@ -28,7 +28,7 @@ The site is an original implementation: its code, copy, and imagery are all orig
 | 📮 Inquiry form | Shared zod schema client + server, honeypot, per-IP rate limiting (5 / 10 min), SQLite persistence via Prisma (fail-open) |
 | 🔒 Hardened headers | CSP (incl. the deployment host's analytics origin), HSTS, X-Frame-Options, nosniff, Referrer-/Permissions-Policy emitted by the app |
 | ♿ Accessibility | Skip-to-content link, semantic landmarks, aria states, focus-visible rings, no-JS reveal guard, reduced-motion guards |
-| 🧪 Verified | 62 unit tests + 83 Playwright e2e specs, strict TypeScript, clean ESLint, production smoke test + cold-load CLS regression harness |
+| 🧪 Verified | 71 unit tests + 83 Playwright e2e specs, strict TypeScript, clean ESLint, production smoke test + cold-load CLS regression harness |
 
 ## Architecture
 
@@ -128,7 +128,7 @@ Requires Node.js ≥ 20 and Bun ≥ 1.1.
 **Verify setup**
 
 ```bash
-bun run test        # → Test Files 8 passed (8), Tests 62 passed (62)
+bun run test        # → Test Files 8 passed (8), Tests 71 passed (71)
 bun run build       # → ✓ Compiled successfully, 20 routes generated
 bun run e2e         # → 83 passed (chromium + mobile; starts its own `next start` on :3002)
 bun run start & curl -s localhost:3000/api/health
