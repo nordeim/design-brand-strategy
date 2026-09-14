@@ -616,6 +616,18 @@ bodies explain "why". The first commit on `main` is the repository owner's promp
 | `next.config.ts` | 45 | Security header contract |
 | `src/app/layout.tsx` | 85 | Fonts, no-flash theme script, metadata, shell |
 
+**`scripts/` inventory (post pass-5 audit):** the operational tools are `db.ts`
+(Prisma CLI wrapper behind `bun run db:*`), `cls-regression.mjs` + `gap-proxy.mjs`
+(ADR-012 cold-load CLS gate), and `live-deploy-audit.mjs` (post-deploy state
+gate). Three retained dev utilities are sandbox-session tooling, not repo
+dependencies: `vlm-audit.mjs` (generic VLM pairwise CLI — needs the
+`z-ai-web-dev-sdk`, installed in the session sandbox, not in `package.json`),
+`capture-sections.sh` (agent-browser section screenshots — needs the
+`agent-browser` CLI), and `contrast-check.mjs` (pure-node WCAG ratio
+calculator). The seven car-care reference scripts that previously cluttered
+the folder were removed in remediation pass 5 (AUD5-F1) — git history
+preserves them.
+
 ---
 
 ## 12. Glossary
