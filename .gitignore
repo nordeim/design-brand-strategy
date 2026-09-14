@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 
+# npm lockfile — bun.lock is canonical (AGENTS.md); npm installs are reference-only
+package-lock.json
+
 # Builds
 .next/
 out/

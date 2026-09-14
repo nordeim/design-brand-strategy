@@ -7,7 +7,14 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      // 'unsafe-inline' stays: Next's RSC payload + the inline theme script
+      // require it (see ADR notes in AGENTS.md — do not tighten without
+      // re-testing hydration). The cloudflareinsights origin is allowed
+      // because the deployment host (Cloudflare) injects its Web Analytics
+      // beacon into every page; without the allowance the beacon is blocked
+      // by the policy (live console error, analytics dead). If the host or
+      // its analytics ever changes, keep this list in sync.
+      "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
       "img-src 'self' data: blob:",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",

@@ -82,6 +82,42 @@ test.describe("home smoke", () => {
     await expect(page.getByRole("link", { name: "View the work" })).toBeVisible();
   });
 
+  test("unknown case-study slugs hard-404 (dynamicParams contract)", async ({ page }) => {
+    // P3-1/P3-F2: /work/<slug> is SSG-only — every valid slug comes from
+    // generateStaticParams. An unknown slug must 404 at the router with the
+    // real 404 status, never a 200 shell with streamed not-found content
+    // (which the CDN would cache for a year under s-maxage=31536000).
+    const response = await page.goto("/work/this-slug-was-decided-against");
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      "This page was decided against.",
+    );
+  });
+
+  test("home HTML streams in document order (CLS regression guard)", async ({ request }) => {
+    // P3-2/P3-3 (ADR-012): a root-level loading boundary splits the stream
+    // into shell (header + footer) then content — Chrome paints the partial
+    // shell during delivery gaps and the footer jumps ~5400px when content
+    // arrives (measured CLS 0.31 on the live deploy). The contract: the
+    // prerendered home HTML is ONE shell in document order — page content
+    // precedes the footer, and there is no Suspense move-script ($RC) or
+    // streamed-segment placeholder (<!--$?-->) left in the document.
+    const response = await request.get("/");
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    // "alder-pine" (first work-card href) marks the page-content region;
+    // the H1 text itself is split by an <em> tag in the markup.
+    const contentByte = html.indexOf("alder-pine");
+    const footerByte = html.indexOf("<footer");
+    expect(contentByte).toBeGreaterThan(-1);
+    expect(footerByte).toBeGreaterThan(-1);
+    expect(footerByte, "footer must stream AFTER the page content").toBeGreaterThan(
+      contentByte,
+    );
+    expect(html).not.toContain("$RC(");
+    expect(html).not.toContain("<!--$?-->");
+  });
+
   test("health endpoint reports service identity without caching", async ({ request }) => {
     const response = await request.get("/api/health");
     expect(response.status()).toBe(200);
@@ -110,6 +146,10 @@ test.describe("home smoke", () => {
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
+    // P3-F5: the deployment host (Cloudflare) injects its Web Analytics
+    // beacon; the CSP must allow that origin or the beacon 404s against the
+    // policy on every page (live console error, analytics dead).
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com");
   });
 
   test("no axe critical violations on home", async ({ page }) => {

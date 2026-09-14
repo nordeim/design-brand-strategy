@@ -20,6 +20,15 @@ const DETAIL_ASPECT_CLASS = {
 
 type PageProps = { params: Promise<{ slug: string }> };
 
+/**
+ * SSG-only route (ADR-012): every valid slug comes from generateStaticParams
+ * over PROJECTS. Unknown slugs must hard-404 at the router — never render
+ * on demand — so a bogus slug can never produce a 200 response that the
+ * CDN caches for a year (measured live bug: /work/<bogus> → 200 +
+ * s-maxage=31536000).
+ */
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   return PROJECTS.map((project) => ({ slug: project.slug }));
 }
