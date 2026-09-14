@@ -15,7 +15,7 @@ export const SITE = {
   email: "studio@elenavance.com",
   description:
     "Elena Vance is an independent designer and brand strategist in New York, building considered identities, design systems, and art direction for ambitious companies and cultural institutions.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "http://localhost:3000",
   /** Content revision date — the deterministic stamp used by the sitemap. */
   contentUpdatedAt: "2026-09-13",
 } as const;

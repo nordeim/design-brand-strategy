@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Editorial portfolio site (Elena Vance — Designer & Brand Strategist). Next.js 16 App Router + React 19 + Tailwind CSS 4 + TypeScript strict. **No database, no auth, no client state library** — a mostly-static marketing site with two API routes.
+Editorial portfolio site (Elena Vance — Designer & Brand Strategist). Next.js 16 App Router + React 19 + Tailwind CSS 4 + TypeScript strict + Prisma SQLite (ADR-011). **No auth, no client state library** — a mostly-static marketing site with two API routes and a single `ContactInquiry` table.
 
 ## Commands
 
@@ -16,8 +16,10 @@ Editorial portfolio site (Elena Vance — Designer & Brand Strategist). Next.js 
 | `bun run e2e:report` | Open the Playwright HTML report |
 | `bun run lint` | ESLint (flat config, next/core-web-vitals) |
 | `bun run typecheck` | `tsc --noEmit` |
+| `bun run db:generate` | Generate Prisma Client (run after `prisma/schema.prisma` changes) |
+| `bun run db:push` | Push schema to `db/custom.db` (wrapper via `scripts/db.ts` + shared `src/lib/wcc/db-url.ts` resolver) |
 
-Verification order before pushing: `lint → typecheck → test → build → e2e`. All five are green; keep them that way.
+Verification order before pushing: `cp .env.example .env → db:generate → db:push → lint → typecheck → test → build → e2e`. All six are green; keep them that way. CI (`.github/workflows/verify-gate.yml`) runs the same gate on every push.
 
 ## Architecture facts an agent would guess wrong
 
@@ -35,14 +37,14 @@ Verification order before pushing: `lint → typecheck → test → build → e2
 
 ## API contract
 
-- `POST /api/contact` — zod-validated (shared schema `src/lib/contact.ts`), rate-limited 5 req / 10 min / IP, honeypot field `website` handled client-side. Returns `202` (no persistence — structured log is the delivery integration point; see README).
+- `POST /api/contact` — zod-validated (shared schema `src/lib/contact.ts`), rate-limited 5 req / 10 min / IP, honeypot field `website` handled client-side, persisted to `ContactInquiry` via Prisma SQLite (fail-open: DB error still returns `202` and logs `contact_inquiry_db_failed`). Returns `202` (structured log remains the delivery integration point; see README + ADR-011).
 - `GET /api/health` — liveness probe.
 
 ## Gotchas
 
 - Unit tests import config from `@/data/site` — the estimator test derives expectations from the multiplier tables, so changing a multiplier requires re-checking `estimator.test.ts` (comments carry the arithmetic). Data-contract tests (`src/data/*.test.ts`) will fail if you add a project without an aspect field or a non-existent image path — that is their job.
-- **Remote is `git@github.com:nordeim/design-brand-strategy.git` (SSH). The first commit on `main` is the repo owner's prompt stub (`docs/prompt-to-create.md`) — do not delete it.
-- `.env.example` documents the single env var: `NEXT_PUBLIC_SITE_URL` (metadataBase, sitemap, robots) plus the optional Playwright `E2E_PORT` / `E2E_BASE_URL`.
+- **Remote is `https://github.com/nordeim/design-brand-strategy.git` (SSH alias `git@github.com:nordeim/design-brand-strategy.git` also valid). The first commit on `main` is the repo owner's prompt stub (`docs/prompt-to-create.md`) — do not delete it.
+- `.env.example` documents `DATABASE_URL` (SQLite `file:../db/custom.db`, resolved via `src/lib/wcc/db-url.ts` for CLI/runtime/standalone) + `NEXT_PUBLIC_SITE_URL` (metadataBase, sitemap, robots) + optional Playwright `E2E_PORT` / `E2E_BASE_URL`. The DB file `db/custom.db` is gitignored (PII).
 
 ## Playwright e2e suite
 

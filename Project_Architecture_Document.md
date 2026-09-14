@@ -1,9 +1,9 @@
-# design-brand-strategy — Master Project Architecture Document (PAD) v1.0.0
+# design-brand-strategy — Master Project Architecture Document (PAD) v1.1.0
 
 **Classification:** Internal Engineering Reference
-**Status:** DEFINITIVE, PRODUCTION-LOCKED BLUEPRINT
+**Status:** DEFINITIVE, PRODUCTION-LOCKED BLUEPRINT (ADR-011 supersedes ADR-002)
 **Companion Documents:** `README.md` (public face), `CLAUDE.md` (agent working contract), `AGENTS.md` (compact agent onboarding)
-**Last Updated:** 2026-09-13
+**Last Updated:** 2026-09-13 — v1.1.0 adds Prisma SQLite (ADR-011), ContactInquiry persistence, and CI DB provisioning
 **Audience:** Senior Engineers, Tech Leads, DevOps, and Onboarding Engineers
 **Rule:** Every architectural decision in this document traces to a specific rationale. Nothing is here "because it's popular."
 
@@ -11,6 +11,10 @@
 
 - `[SR]` Initial document generated after production verification (build, 18 unit tests, lint, typecheck, API smoke test, visual QA).
 - `[SR]` Contrast ratios in §5 measured programmatically (WCAG 2.1 relative-luminance formula), not estimated.
+
+#### Revision Block — v1.1.0 (ADR-011)
+
+- `[DB]` Supersede ADR-002 — add Prisma 6.19.3 + SQLite `db/custom.db` for `ContactInquiry` persistence (see `docs/ADR-011-prisma-sqlite.md`); add `db:*` scripts, `src/lib/wcc/db-url.ts` resolver, `src/lib/db.ts` singleton; wire `POST /api/contact` to `db.contactInquiry.create` (fail-open); provision `.env.example` `DATABASE_URL`; adapt `.github/workflows/verify-gate.yml` to `cp .env.example .env → db:generate → db:push` before the documented gate; update `tsconfig.json` exclude `scripts` + `e2e` for clean `typecheck`; bump tests 44→52 (new `db-url` contract tests).
 
 ### Table of Contents
 
@@ -142,6 +146,14 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 - **Consequences:** (+) All twelve findings closed with e2e regression guards; estimator deep-links and math preserved. (−) The wizard's progressive disclosure is gone (source parity wins); case heroes crop portrait covers harder via `object-cover` (identical to source behavior); richer card summaries moved to case pages only.
 - **Alternatives Rejected:** Keeping the wizard (interaction-model divergence from source); regenerating imagery at new aspect ratios (source itself object-crops its 1280×800 set; no need).
 
+**ADR-011: Prisma SQLite for ContactInquiry persistence (supersedes ADR-002)**
+
+- **Context:** ADR-002 left `POST /api/contact` log-only; `scripts/db.ts` + workflow assumed a DB that did not exist; Option B approved to persist inquiries without migrating editorial content.
+- **Decision:** SQLite via Prisma 6.19.3, `file:../db/custom.db` re-anchored by `src/lib/wcc/db-url.ts` for CLI/runtime/standalone convergence, single `ContactInquiry` model (mirrors `contactSchema`, `cuid()` + `createdAt` indexes), `src/lib/db.ts` singleton, `db:*` scripts via `scripts/db.ts` wrapper, fail-open `db.contactInquiry.create` in `api/contact` (202 even if DB fails).
+- **Rationale:** Minimal durable sink for the only write path; reuses the proven `car-care` resolver pattern; keeps content-as-code for `SERVICES`/`PROJECTS`.
+- **Consequences:** (+) inquiries durable; CI provisions `db/custom.db` per run; (−) adds `prisma` deps, `db:generate` before `typecheck`/`build`, PII in `db/` (gitignored).
+- **Alternatives Rejected:** Keep log-only (Option A); Drizzle; Postgres.
+
 ---
 
 ## 2. High-Level System Topology
@@ -209,7 +221,7 @@ design-brand-strategy/
 ├── postcss.config.mjs               ← @tailwindcss/postcss only
 ├── .env.example                     ← NEXT_PUBLIC_SITE_URL
 ├── public/
-│   └── images/                      ← 15 generated PNGs (portraits, covers, details)
+│   └── images/                      ← 19 generated WebP originals (~2.5 MB, portraits, covers, details)
 └── src/
     ├── app/
     │   ├── layout.tsx               ← fonts (Instrument Serif + Inter), theme script, shell

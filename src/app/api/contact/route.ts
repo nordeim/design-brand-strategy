@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 
 import { contactSchema, fieldErrors } from "@/lib/contact";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { db } from "@/lib/db";
 
 /**
  * Contact inquiry intake.
  *
- * Validates authoritatively server-side and rate-limits per client. This
- * deployment has no persistence layer by design — validated inquiries are
- * emitted as structured logs (wire an email provider or CRM hook here in
- * production; see README "Contact form" section).
+ * Validates authoritatively server-side and rate-limits per client.
+ * Validated inquiries are persisted to SQLite via Prisma (ADR-011) and
+ * emitted as structured logs — the log remains the integration point for
+ * email/CRM delivery; the DB is the durable sink.
  */
 
 const WINDOW_MS = 10 * 60 * 1_000;
@@ -36,6 +37,30 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { ok: false, errors: fieldErrors(parsed.error) },
       { status: 400 },
+    );
+  }
+
+  // Persist to SQLite — fail-open: a DB error must not turn a valid
+  // inquiry into a 500 (the log remains the delivery integration point).
+  try {
+    await db.contactInquiry.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        company: parsed.data.company || null,
+        projectType: parsed.data.projectType,
+        budget: parsed.data.budget,
+        message: parsed.data.message,
+        referral: parsed.data.referral || null,
+      },
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "contact_inquiry_db_failed",
+        error: error instanceof Error ? error.message : String(error),
+      }),
     );
   }
 

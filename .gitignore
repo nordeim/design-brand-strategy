@@ -42,3 +42,11 @@ ssh-key.txt
 .idea/
 .vscode/
 *.swp
+
+server.log
+# Skills directory
+/skills/
+
+# runtime sqlite database (contains customer PII — never commit)
+/db/*.db
+/db/*.db-journal

@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Contact inquiries submitted through /contact.
+// This is the sole persistence use-case for the DB-free portfolio
+// superseded by ADR-011 — editorial content (services, projects)
+// remains content-as-code in src/data/*.ts.
+model ContactInquiry {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  company     String?
+  projectType String
+  budget      String
+  message     String
+  referral    String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+}
