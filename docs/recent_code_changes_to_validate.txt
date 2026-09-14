@@ -1,22 +1,46 @@
 $ git pull
-Updating de63134..6d95987
+Updating 3c38b8b..245a613
 Fast-forward
  AGENTS.md                        |   2 +-
- CLAUDE.md                        |   7 ++++--
- Project_Architecture_Document.md |  25 ++++++++++++-------
- README.md                        |  13 +++++++---
- design-brand-strategy_SKILL.md   |  73 +++++++++++++++++++++++++++++++++++++++++++++++---------
- docs/AUDIT_CODE_REVIEW.md        |  57 +++++++++++++++++++++++++++++++++++++++++++
- docs/AUDIT_VISUAL_PARITY.md      |  25 +++++++++++++++++++
- docs/REMEDIATION_PLAN.md         |  88 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- docs/session_2.md                |  27 +++++++++++++++++++++
- e2e/contact.spec.ts              |  76 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- scripts/live-deploy-audit.mjs    | 183 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- src/lib/rate-limit.test.ts       |  53 +++++++++++++++++++++++++++++++++++++++-
- src/lib/rate-limit.ts            |  48 +++++++++++++++++++++++++++++++++++++
- 13 files changed, 649 insertions(+), 28 deletions(-)
- create mode 100644 docs/session_2.md
- create mode 100644 scripts/live-deploy-audit.mjs
+ Project_Architecture_Document.md |  12 ++++++++++++
+ README.md                        |   4 ++--
+ db/custom.db                     | Bin 28672 -> 0 bytes
+ design-brand-strategy_SKILL.md   |  16 ++++++++++------
+ docs/AUDIT_CODE_REVIEW.md        |  77 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ docs/AUDIT_VISUAL_PARITY.md      |  25 +++++++++++++++++++++++++
+ docs/REMEDIATION_PLAN.md         | 143 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ docs/session_4.md                |  22 ++++++++++++++++++++++
+ scripts/gen-images.sh            |  31 -------------------------------
+ scripts/hero-variants.mjs        |  19 -------------------
+ scripts/optimize-images.mjs      |  19 -------------------
+ scripts/skill-verify.sh          | 129 ---------------------------------------------------------------------------------------------------------------------------------
+ scripts/vlm-audit-pass2.mjs      |  60 ------------------------------------------------------------
+ scripts/vlm-check.mjs            |  17 -----------------
+ scripts/vlm-parity-audit.mjs     |  82 ----------------------------------------------------------------------------------
+ 16 files changed, 292 insertions(+), 366 deletions(-)
+ delete mode 100644 db/custom.db
+ create mode 100644 docs/session_4.md
+ delete mode 100755 scripts/gen-images.sh
+ delete mode 100644 scripts/hero-variants.mjs
+ delete mode 100644 scripts/optimize-images.mjs
+ delete mode 100644 scripts/skill-verify.sh
+ delete mode 100644 scripts/vlm-audit-pass2.mjs
+ delete mode 100644 scripts/vlm-check.mjs
+ delete mode 100644 scripts/vlm-parity-audit.mjs
+
+$ grep -v '^#' .env
+
+DATABASE_URL=file:../db/custom.db
+
+
+NEXT_PUBLIC_SITE_URL=https://design-brand-strategy.jesspete.shop
+SITE_URL=https://design-brand-strategy.jesspete.shop
+
+$ bun install
+[0.04ms] ".env"
+bun install v1.3.14 (0d9b296a)
+
+13 packages installed [191.00ms]
 
 $ bun run db:migrate
 $ bun scripts/db.ts migrate dev
@@ -25,12 +49,21 @@ Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 Datasource "db": SQLite database "custom.db" at "file:/Home1/project/design-brand-strategy/db/custom.db"
 
-Already in sync, no schema change or pending migration was found.
+SQLite database custom.db created at file:/Home1/project/design-brand-strategy/db/custom.db
 
-✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 295ms
+Applying migration `20260914014933_init`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260914014933_init/
+    └─ migration.sql
+
+Your database is now in sync with your schema.
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 285ms
 
 
-(venv) pete@pop-os:/Home1/project/design-brand-strategy
 $ bun run db:push
 $ bun scripts/db.ts db push --accept-data-loss
 [db] DATABASE_URL resolved to file:/Home1/project/design-brand-strategy/db/custom.db
@@ -40,21 +73,22 @@ Datasource "db": SQLite database "custom.db" at "file:/Home1/project/design-bran
 
 The database is already in sync with the Prisma schema.
 
-✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 451ms
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 258ms
 
-(venv) pete@pop-os:/Home1/project/design-brand-strategy
+$ rm -rf .next/
+
 $ bun run build
 $ next build
 ▲ Next.js 16.3.5 (Turbopack)
 - Environments: .env
-✓ Running next.config.ts took 61ms
+✓ Running next.config.ts took 39ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 837ms
-✓ Finished TypeScript in 5.4s
-✓ Collecting page data using 3 workers in 730ms
-✓ Generating static pages using 3 workers (20/20) in 629ms
-✓ Finalizing page optimization in 15ms
+✓ Compiled successfully in 8.8s
+✓ Finished TypeScript in 6.6s    
+✓ Collecting page data using 3 workers in 839ms    
+✓ Generating static pages using 3 workers (20/20) in 666ms
+✓ Finalizing page optimization in 5ms    
 
 Route (app)
 ┌ ○ /
@@ -79,11 +113,12 @@ Route (app)
 ●  (SSG)      prerendered as static HTML (uses generateStaticParams)
 ƒ  (Dynamic)  server-rendered on demand
 
-$ grep -v '^#' .env
-
-DATABASE_URL=file:../db/custom.db
-
-
-NEXT_PUBLIC_SITE_URL=https://design-brand-strategy.jesspete.shop
-SITE_URL=https://design-brand-strategy.jesspete.shop
+(venv) pete@pop-os:/Home1/project/design-brand-strategy
+$ PORT=3006 bun run start
+$ next start
+▲ Next.js 16.3.5
+- Local:         http://localhost:3006
+- Network:       http://192.168.1.2:3006
+✓ Ready in 169ms
+✓ Running next.config.ts took 65ms
 
