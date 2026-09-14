@@ -31,8 +31,35 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
   return true;
 }
 
-/** Derives a client key from proxy headers (best-effort, as behind an edge). */
+/**
+ * Derives a client key for rate limiting from proxy headers.
+ *
+ * Trust order (AUD-1 hardening, audit pass 3):
+ *  1. `cf-connecting-ip` — Cloudflare overwrites it with the real connecting
+ *     IP and clients cannot forge it through the edge. Preferred whenever
+ *     present (the live deploy is CF-fronted).
+ *  2. The **last** `x-forwarded-for` entry — proxies APPEND the real client
+ *     IP to the chain, so the final hop is the proxy-added value; earlier
+ *     entries are client-supplied and forgeable. (Single-hop chains — the
+ *     e2e isolation pattern — key on themselves, so specs are unaffected.)
+ *  3. `x-real-ip` — set by some reverse proxies to the direct peer.
+ *  4. `local` — direct development traffic.
+ *
+ * Still best-effort identity (K-7): a single-instance in-memory limiter is
+ * a bound, not an auth boundary.
+ */
 export function clientKey(request: Request): string {
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp && cfIp.trim()) return cfIp.trim();
+
   const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
+  if (forwarded) {
+    const hops = forwarded
+      .split(",")
+      .map((hop) => hop.trim())
+      .filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1];
+  }
+
+  return request.headers.get("x-real-ip") ?? "local";
 }

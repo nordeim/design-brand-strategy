@@ -64,7 +64,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Structured, size-capped log line — the integration point for delivery.
+  // Structured log line — the integration point for delivery (AUD-2 posture:
+  // the message BODY is never logged, only its length; name/email/company/
+  // referral are logged deliberately as delivery-hook data and also persist
+  // to SQLite (ADR-011) — treat these lines as PII-bearing).
   console.info(
     JSON.stringify({
       level: "info",
