@@ -1,35 +1,89 @@
 $ git pull
-Updating 50c357f..d738631
+Updating de63134..6d95987
 Fast-forward
- .gitignore                                      |    3 +
- AGENTS.md                                       |   15 +-
- CLAUDE.md                                       |   41 +-
- Project_Architecture_Document.md                |   28 +-
- README.md                                       |   70 +-
- bun.lock                                        |    4 +-
- db/custom.db                                    |  Bin 28672 -> 0 bytes
- design-brand-strategy_SKILL.md                  |  138 ++-
- docs/AUDIT_CODE_REVIEW.md                       |   50 +
- docs/REMEDIATION_PLAN.md                        |   87 ++
- docs/how-to-git-push-using-ssh-wrapper_SKILL.md |   89 ++
- docs/ssh_git_wrapper_v3.py                      |  183 ++++
- e2e/smoke.spec.ts                               |   40 +
- next.config.ts                                  |    9 +-
- package-lock.json                               | 8045 ----------------------------------------------------------------------------------------------------------------------------------------------------------
- scripts/cls-regression.mjs                      |   96 ++
- scripts/gap-proxy.mjs                           |   45 +
- src/app/api/contact/route.ts                    |    5 +-
- src/app/loading.tsx                             |   11 -
- src/app/work/[slug]/page.tsx                    |    9 +
- src/lib/rate-limit.test.ts                      |   69 ++
- src/lib/rate-limit.ts                           |   31 +-
- tsconfig.json                                   |    4 +-
- 
- delete mode 100644 db/custom.db
- create mode 100644 docs/how-to-git-push-using-ssh-wrapper_SKILL.md
- create mode 100644 docs/ssh_git_wrapper_v3.py
- delete mode 100644 package-lock.json
- create mode 100644 scripts/cls-regression.mjs
- create mode 100644 scripts/gap-proxy.mjs
- delete mode 100644 src/app/loading.tsx
- create mode 100644 src/lib/rate-limit.test.ts
+ AGENTS.md                        |   2 +-
+ CLAUDE.md                        |   7 ++++--
+ Project_Architecture_Document.md |  25 ++++++++++++-------
+ README.md                        |  13 +++++++---
+ design-brand-strategy_SKILL.md   |  73 +++++++++++++++++++++++++++++++++++++++++++++++---------
+ docs/AUDIT_CODE_REVIEW.md        |  57 +++++++++++++++++++++++++++++++++++++++++++
+ docs/AUDIT_VISUAL_PARITY.md      |  25 +++++++++++++++++++
+ docs/REMEDIATION_PLAN.md         |  88 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ docs/session_2.md                |  27 +++++++++++++++++++++
+ e2e/contact.spec.ts              |  76 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ scripts/live-deploy-audit.mjs    | 183 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/lib/rate-limit.test.ts       |  53 +++++++++++++++++++++++++++++++++++++++-
+ src/lib/rate-limit.ts            |  48 +++++++++++++++++++++++++++++++++++++
+ 13 files changed, 649 insertions(+), 28 deletions(-)
+ create mode 100644 docs/session_2.md
+ create mode 100644 scripts/live-deploy-audit.mjs
+
+$ bun run db:migrate
+$ bun scripts/db.ts migrate dev
+[db] DATABASE_URL resolved to file:/Home1/project/design-brand-strategy/db/custom.db
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": SQLite database "custom.db" at "file:/Home1/project/design-brand-strategy/db/custom.db"
+
+Already in sync, no schema change or pending migration was found.
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 295ms
+
+
+(venv) pete@pop-os:/Home1/project/design-brand-strategy
+$ bun run db:push
+$ bun scripts/db.ts db push --accept-data-loss
+[db] DATABASE_URL resolved to file:/Home1/project/design-brand-strategy/db/custom.db
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": SQLite database "custom.db" at "file:/Home1/project/design-brand-strategy/db/custom.db"
+
+The database is already in sync with the Prisma schema.
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 451ms
+
+(venv) pete@pop-os:/Home1/project/design-brand-strategy
+$ bun run build
+$ next build
+▲ Next.js 16.3.5 (Turbopack)
+- Environments: .env
+✓ Running next.config.ts took 61ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 837ms
+✓ Finished TypeScript in 5.4s
+✓ Collecting page data using 3 workers in 730ms
+✓ Generating static pages using 3 workers (20/20) in 629ms
+✓ Finalizing page optimization in 15ms
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /about
+├ ƒ /api/contact
+├ ƒ /api/health
+├ ƒ /contact
+├ ○ /icon.svg
+├ ○ /robots.txt
+├ ○ /services
+├ ○ /sitemap.xml
+├ ○ /work
+└   /work/[slug]
+  ├ ● /work/alder-pine
+  ├ ● /work/vantage
+  ├ ● /work/emberline
+  └ ● [+5 more paths]
+
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+
+$ grep -v '^#' .env
+
+DATABASE_URL=file:../db/custom.db
+
+
+NEXT_PUBLIC_SITE_URL=https://design-brand-strategy.jesspete.shop
+SITE_URL=https://design-brand-strategy.jesspete.shop
+
