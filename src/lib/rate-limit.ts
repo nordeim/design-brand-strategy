@@ -63,3 +63,51 @@ export function clientKey(request: Request): string {
 
   return request.headers.get("x-real-ip") ?? "local";
 }
+
+/**
+ * Classifies the status sequence of a same-key burst probe (limit+1 requests
+ * sharing one spoofed `x-forwarded-for`) so the contact e2e specs can tell
+ * whether per-XFF bucket isolation actually works on the target origin
+ * (P4-F1). Behind an edge proxy that overwrites client identity (Cloudflare
+ * sets `cf-connecting-ip` — see clientKey's trust order), every request lands
+ * in ONE bucket regardless of the spoofed header, and the limiter trips early
+ * or immediately; on a self-managed origin the exact contract sequence
+ * `[202 × limit, 429]` is observed.
+ *
+ *  - "isolated": exactly 202×limit followed by 429 — per-XFF keying works.
+ *  - "shared":   a 429 appears before the limit-th response, or every request
+ *                was limited — the origin keys requests by something the
+ *                client cannot spoof (or the bucket was pre-burned by traffic
+ *                from an earlier run inside the window).
+ *  - "broken":   no 429 at all, an unexpected status shape, or too few
+ *                responses — the limiter contract itself looks wrong.
+ *
+ * Used by `e2e/contact.spec.ts` to skip (loudly, with evidence) the two
+ * isolation-dependent specs when the suite runs against an edge-fronted
+ * external server via `E2E_BASE_URL`.
+ */
+export function classifyBurstStatuses(
+  statuses: number[],
+  limit: number,
+): "isolated" | "shared" | "broken" {
+  if (statuses.length < limit + 1) return "broken";
+
+  const firstLimited = statuses.indexOf(429);
+  if (firstLimited === -1) return "broken";
+
+  // Everything before the first 429 must be an allowed submission; anything
+  // else (400/500/403…) means the responses are not describing the limiter.
+  const beforeLimit = statuses.slice(0, firstLimited);
+  if (beforeLimit.some((s) => s !== 202)) return "broken";
+
+  if (firstLimited === limit) {
+    // The boundary case: `limit` successes then the (limit+1)-th is limited —
+    // but only "isolated" if the tail is entirely limited as well.
+    const tail = statuses.slice(firstLimited);
+    return tail.every((s) => s === 429) ? "isolated" : "broken";
+  }
+
+  // The limiter tripped before the bucket could have filled from this burst
+  // alone — requests are being keyed together beyond the spoofed header.
+  return "shared";
+}

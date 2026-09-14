@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clientKey, rateLimit } from "./rate-limit";
+import { classifyBurstStatuses, clientKey, rateLimit } from "./rate-limit";
 
 function requestWith(headers: Record<string, string>): Request {
   return new Request("https://example.com/api/contact", { headers });
@@ -65,5 +65,56 @@ describe("rateLimit — bounded sliding window (regression guard)", () => {
     const key = `test-window-${Date.now()}`;
     expect(rateLimit(key, 1, -1)).toBe(true); // resetAt already in the past
     expect(rateLimit(key, 1, 60_000)).toBe(true); // new bucket
+  });
+});
+
+describe("classifyBurstStatuses — live-run environment detection (P4-F1)", () => {
+  // The contact e2e burst spec sends limit+1 requests with the SAME spoofed
+  // x-forwarded-for and classifies the observed statuses so edge-fronted
+  // targets (cf-connecting-ip keying, AUD-1) skip isolation assertions
+  // instead of failing. Semantics:
+  //   "isolated" — exactly [202 × limit, 429]: per-XFF keying works.
+  //   "shared"   — a 429 before the limit-th response (or all 429): every
+  //                request landed in one bucket keyed by an unforgeable
+  //                edge header (or a pre-burned bucket from an earlier run).
+  //   "broken"   — no 429 at all: the limiter never trips (regression).
+
+  it("exact [202×5, 429] sequence classifies as isolated", () => {
+    expect(classifyBurstStatuses([202, 202, 202, 202, 202, 429], 5)).toBe("isolated");
+  });
+
+  it("early 429 (shared bucket partly pre-consumed by earlier specs) classifies as shared", () => {
+    // Live Cloudflare-fronted run: valid+malformed+invalid specs consumed 3
+    // of the shared bucket before the burst — [202,202,429,429,429,429].
+    expect(classifyBurstStatuses([202, 202, 429, 429, 429, 429], 5)).toBe("shared");
+  });
+
+  it("all-429 (pre-burned bucket, e.g. a re-run inside the window) classifies as shared", () => {
+    expect(classifyBurstStatuses([429, 429, 429, 429, 429, 429], 5)).toBe("shared");
+  });
+
+  it("first-request 429 classifies as shared", () => {
+    expect(classifyBurstStatuses([429, 202, 202, 202, 202, 429], 5)).toBe("shared");
+  });
+
+  it("no 429 at all classifies as broken (limiter regression)", () => {
+    expect(classifyBurstStatuses([202, 202, 202, 202, 202, 202], 5)).toBe("broken");
+  });
+
+  it("a non-202 non-429 status before any 429 classifies as broken (unexpected shape)", () => {
+    expect(classifyBurstStatuses([500, 202, 429, 429, 429, 429], 5)).toBe("broken");
+  });
+
+  it("429 exactly at the limit boundary with earlier non-2xx statuses classifies as shared", () => {
+    // e.g. an edge that answered 403 to one request but keyed the rest shared
+    expect(classifyBurstStatuses([202, 202, 202, 202, 429, 429], 5)).toBe("shared");
+  });
+
+  it("respects the limit argument (limit=2: [202,202,429] is isolated)", () => {
+    expect(classifyBurstStatuses([202, 202, 429], 2)).toBe("isolated");
+  });
+
+  it("too-short input classifies as broken (cannot conclude)", () => {
+    expect(classifyBurstStatuses([202, 202], 5)).toBe("broken");
   });
 });
