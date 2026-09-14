@@ -52,8 +52,10 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 | Icons | lucide-react | 1.45.0 | Tree-shakeable inline SVG; no icon font (CSP-friendly) |
 | Unit testing | Vitest | 4.1.11 | Fast ESM-native runner; `@` alias parity with the app |
 | Linting | ESLint (flat config) | 9.39.5 | `next/core-web-vitals` + react-hooks rules incl. `set-state-in-effect` as hard error |
+| E2E | @playwright/test | 1.63.0 | 83 specs; chromium (153) + Pixel-7 projects against the production build |
+| Persistence | Prisma + @prisma/client | 6.19.3 | Single `ContactInquiry` model on SQLite (ADR-011); shared `DATABASE_URL` resolver |
 | Package manager | Bun | ≥ 1.1 (lockfile v1.3.14) | Fast installs; `bun.lock` committed as the lockfile |
-| Database | — (none) | — | See ADR-002 |
+| Database | SQLite via Prisma | 6.19.3 | Contact inquiries only (ADR-011); editorial content stays code (ADR-002 scope) |
 
 ### 1.3 Architecture Decision Records
 
@@ -130,7 +132,7 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 **ADR-009: Playwright e2e layer validating the production artifact**
 
 - **Context:** The original verification story was unit tests plus manual smoke (curl + agent-browser probes). Visual/interaction parity facts lived in audit documents but had no executable regression guards, and dev-HMR hydration can diverge from the shipped build.
-- **Decision:** Add a Playwright suite (`playwright.config.ts` + `e2e/*.spec.ts`, 81 specs) adapted from the home-financing reference: a managed `next start` webServer on :3002 validates the production build; projects are Desktop Chromium plus a Pixel-7 mobile-emulation project scoped to `mobile.spec.ts` (the responsive fork); workers are serial because contact-API tests mutate shared in-memory rate-limit state (tests spoof unique `x-forwarded-for` values). Specs import `src/data/*` directly so slugs, images, and titles are data-driven. `@playwright/test` is pinned to 1.62.0 (matches the locally cached Chromium 151; bun.lock locks it).
+- **Decision:** Add a Playwright suite (`playwright.config.ts` + `e2e/*.spec.ts`, 83 specs) adapted from the home-financing reference: a managed `next start` webServer on :3002 validates the production build; projects are Desktop Chromium plus a Pixel-7 mobile-emulation project scoped to `mobile.spec.ts` (the responsive fork); workers are serial because contact-API tests mutate shared in-memory rate-limit state (tests spoof unique `x-forwarded-for` values). Specs import `src/data/*` directly so slugs, images, and titles are data-driven. `@playwright/test` resolves to 1.63.0 (Chromium 153; bun.lock locks it — keep `playwright-core` deduped at exactly one copy, see pass 3).
 - **Rationale:** Parity and a11y contracts are only real if a machine re-checks them; testing the built artifact catches hydration/static-generation drift that unit tests cannot; the reference repo's config is a proven pattern worth converging on.
 - **Consequences:** (+) Every audit finding now ships with a named regression guard; the security-header contract, SEO pins, and API discipline are pinned; the estimator and mobile nav are exercised end-to-end. (−) e2e adds ~40s to verification and requires the Chromium binary; with `javaScriptEnabled: false` Playwright locators cannot resolve, so no-JS specs assert through `page.evaluate` (documented in the spec header).
 - **Alternatives Rejected:** Continuing with manual probes (not repeatable in CI); jsdom component tests (cannot validate the built artifact or a11y);
@@ -153,6 +155,16 @@ This PAD is the single source of truth for the design-brand-strategy codebase: a
 - **Rationale:** Minimal durable sink for the only write path; reuses the proven `car-care` resolver pattern; keeps content-as-code for `SERVICES`/`PROJECTS`.
 - **Consequences:** (+) inquiries durable; CI provisions `db/custom.db` per run; (−) adds `prisma` deps, `db:generate` before `typecheck`/`build`, PII in `db/` (gitignored).
 - **Alternatives Rejected:** Keep log-only (Option A); Drizzle; Postgres.
+
+---
+
+**ADR-012: Document-order HTML stream — no root loading boundary (remediation pass 3)**
+
+- **Context:** Live-deploy validation (2026-09-14) measured cold-load CLS 0.31 on ~50–75% of first visits and `/work/<bogus-slug>` answering HTTP 200 with not-found content under `Cache-Control: s-maxage=31536000`. Root cause: the root `src/app/loading.tsx` created a Suspense boundary, so Next 16 streamed the layout shell (header + loading fallback + footer at byte ~6.9k) before the page content (byte ~14.9k+, `<!--$?-->` placeholder + hidden segment + `$RC` move-script). During chunked delivery (Cloudflare proxying the origin), Chrome painted the partial shell; the footer jumped ~5400px when content landed, and streamed `notFound()` rendered inside a 200 shell.
+- **Decision:** Remove the root loading boundary entirely so prerendered pages stream as one document-ordered shell (footer byte 6981 → 39496, after the content); add `export const dynamicParams = false` to `/work/[slug]` so unknown slugs hard-404 at the router; pin both contracts with e2e specs (HTTP status + stream byte-order) and `scripts/cls-regression.mjs` (gap-proxy harness replaying the HTML with a 300ms mid-stream pause; worst CLS must stay ≤ 0.1).
+- **Rationale:** All routes are static or near-instant (`/contact` reads only `searchParams`), so a loading fallback buys nothing; a full-viewport fallback experiment (`min-h-[calc(100dvh-4rem)]`) measured WORSE (CLS 0.45) and was rejected; document-order streaming fixes both defects at the mechanism level with a one-file deletion.
+- **Consequences:** (+) CLS 0.0000 through the gap harness; real 404 status; no 1-year-cached soft-404s. (−) A future genuinely-slow dynamic route loses its loading fallback — reintroduce one only at the leaf route that needs it, and re-run the CLS harness; docs (README/CLAUDE/AGENTS/SKILL/PAD) pin the contract.
+- **Alternatives Rejected:** Taller loading fallback (measured worse); moving `SiteFooter` into every page (duplication + error-page regressions); accepting the CLS (Core Web Vitals POOR on first visits).
 
 ---
 
@@ -227,9 +239,11 @@ design-brand-strategy/
     │   ├── layout.tsx               ← fonts (Instrument Serif + Inter), theme script, shell
     │   ├── globals.css              ← design tokens (@theme inline), dark mode, motion guards
     │   ├── page.tsx                 ← home: hero, collage, marquee, work, about, services, CTA
-    │   ├── loading.tsx              ← route-level loading state
     │   ├── error.tsx                ← client error boundary with reset
     │   ├── not-found.tsx            ← branded 404
+    │   ├── (no loading.tsx          ← deliberately absent: root loading boundary
+    │   │                              split the HTML stream and caused cold-load
+    │   │                              CLS 0.31 + soft-404s — ADR-012)
     │   ├── icon.svg                 ← favicon (app-router auto-served)
     │   ├── sitemap.ts               ← 5 static + 8 project routes
     │   ├── robots.ts                ← allow all, disallow /api/, sitemap link
@@ -348,7 +362,8 @@ means content can never depend on JavaScript firing to become visible.
 
 ## 4. Data Architecture
 
-There is no database, by decision (ADR-002). The data layer is code:
+Editorial content is code (ADR-002 scope); contact inquiries persist to
+SQLite via Prisma (ADR-011). The content data layer is code:
 
 | Module | Contents | Consumers |
 |--------|----------|-----------|
@@ -475,9 +490,10 @@ share. The fail-fast contract is tested explicitly (`RangeError` on unknown ids)
 ### 7.3 Coverage Thresholds
 
 No numeric gate is configured; the standard is: **every branch of `src/lib` logic is exercised**
-and **every data-layer contract is pinned by tests** (currently 44 tests across 6 files covering
+and **every data-layer contract is pinned by tests** (currently 62 tests across 8 files covering
 the estimator, the schema + label maps, project aspect invariants, services/FAQ data, sitemap
-determinism, and the no-JS markup guards). Rendering is covered by the build's
+determinism, the no-JS markup guards, the DATABASE_URL resolver, and the rate-limit
+client-key trust order). Rendering is covered by the build's
 prerender step (a page that fails to render fails the build).
 
 ### 7.4 Pre-PR / Pre-Deploy Checklist

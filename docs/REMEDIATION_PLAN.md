@@ -239,3 +239,90 @@ Executed per the TDD order above; every step followed RED → GREEN with the e2e
 **Final gates (all green):** eslint clean · `tsc --noEmit` clean · vitest 44/44 · `next build` 20 routes · Playwright **81/81** (chromium + Pixel-7 mobile) · live re-probes match source measurements exactly.
 
 **Deferred (re-affirmed):** awards-row column arrangement (measured, low-impact), 6-vs-4 services and richer service rows (content richness), dark mode / collage strip / availability pill (pass-1 acceptances), WebKit e2e project (no cached binary).
+
+---
+
+# Pass 3 — Remediation Plan (2026-09-14, third session)
+
+**Inputs:** Live-site E2E validation (81/81 Playwright specs green against `https://design-brand-strategy.jesspete.shop`) + live CWV/CLS probing + visual parity re-audit vs `https://editorial-portfolio-9d8e325b.lovable.app` (VLM + geometry probes) + docs/code alignment audit post-commit `50c357f` ("add skills" — Prisma/ADR-011 integration).
+**Method:** TDD per `skills/tdd` + `skills/test-driven-development` — failing test first (RED), minimal change (GREEN), full gate after each slice. E2E lessons per `skills/e2e-testing-lessons` (Playwright as the regression harness; API + UI hybrid assertions).
+**Branch policy:** main only (operator contract). `skills/` excluded from all checks/tests/compilation (operator contract).
+
+## P3 findings (measured evidence)
+
+| # | Severity | Finding | Evidence |
+|---|---|---|---|
+| P3-1 | HIGH | `/work/<bogus-slug>` returns **HTTP 200** with not-found content + `Cache-Control: s-maxage=31536000` (1-year CDN cache directive) — soft-404s pollute SEO and can fill the CDN cache | `curl -o /dev/null -w %{http_code}` → 200 on live + local; `x-nextjs-prerender: 1`; e2e 404 spec only covers top-level unknown routes |
+| P3-2 | HIGH | Cold-load **CLS 0.31** on live (Core Web Vitals POOR; flaky ~50–75% of cold loads) | layout-shift entries: single 0.31 shift at ~240–390 ms, source FOOTER `y:621 → 0×0`; local=0, warm-cache=0; reproduced deterministically via gap-proxy (300 ms mid-HTML delivery gap) — `WORST CLS: 0.3100` |
+| P3-3 | HIGH (mechanism) | Root cause of P3-2/P3-1: root `src/app/loading.tsx` creates a root Suspense boundary → Next 16 streams the layout shell (header + loading fallback + **footer @ byte 6981**) before page content (byte 14861+) → Chrome paints the partial DOM during CF-proxied delivery gaps → footer jumps ~5400 px; the streamed `notFound()` for bogus slugs renders inside a 200 shell | Byte-offset probes; `<!--$?--><template id="B:0">` + `$RC` move-script in prerendered HTML; removing the boundary makes the stream document-ordered (footer @ byte 39496) and both P3-1 and P3-2 disappear |
+| P3-4 | MEDIUM | Cloudflare Web Analytics beacon blocked by app CSP (`script-src 'self' 'unsafe-inline'`) — console error on every live page, analytics dead | Console: `Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/…' violates CSP` |
+| P3-5 | MEDIUM | **typecheck no longer covers `e2e/`** — `tsconfig.json` excludes `e2e` + `scripts` (added in `50c357f`), contradicting AGENTS/CLAUDE/SKILL ("covers e2e specs") | `git show 50c357f -- tsconfig.json`; the underlying cause was a **duplicate playwright-core** (root 1.62.0 + nested 1.63.0) in `bun.lock` making tsc fail on spec files |
+| P3-6 | MEDIUM | Docs drift post-ADR-011: CLAUDE.md ("No database"), README.md ("no persistence by design"), SKILL.md v2.1.0 ("no database", ADR-002, "44/44 tests", "15 images PNG", playwright 1.62.0) all stale vs the Prisma/SQLite code | Doc reads + `prisma/schema.prisma`, `src/lib/db.ts`, 52 unit tests, 19 WebP |
+| P3-7 | MEDIUM (hygiene) | `db/custom.db` **tracked in git** (27 test rows — e2e contact submissions) despite `.gitignore` `/db/*.db` "PII — never commit" | `git ls-files` → `db/custom.db`; row dump: 27 × "Jordan Lee" test data |
+| P3-8 | LOW (hygiene) | `.env` tracked in git (template, no secrets) while gitignored; `package-lock.json` tracked (8045 lines) though bun is canonical | `git ls-files` |
+| P3-9 | MEDIUM (missing tooling) | `docs/ssh_git_wrapper_v3.py` + `docs/how-to-git-push-using-ssh-wrapper_SKILL.md` referenced by the operator but **absent from the repo** | `ls docs/` |
+| P3-10 | LOW (host-config) | Cloudflare Email Obfuscation rewrites `studio@elenavance.com` in SSR HTML (`data-cfemail` spans) — hydration-mismatch risk + pre-decode flash | HTML grep: `cdn-cgi/l/email-protection#…` on `/` and `/contact` |
+| P3-11 | INFO | Lockfile dependency drift: `@playwright/test` resolves to **1.63.0** (Chromium 153) — docs claim "pinned to 1.62.0 (Chromium 151)" | `bun pm ls`; browser cache `chromium_headless_shell-1243` |
+
+## P3 scope decisions
+
+**In scope (fix now):**
+
+| # | Fix | Files |
+|---|---|---|
+| P3-F1 | Remove the root loading boundary → single-shell document-order stream (fixes P3-1 at the mechanism level + P3-2/P3-3) | delete `src/app/loading.tsx` |
+| P3-F2 | `export const dynamicParams = false` on `/work/[slug]` — unknown slugs hard-404 at the router, never render, never cache (defense-in-depth for P3-1) | `src/app/work/[slug]/page.tsx` |
+| P3-F3 | CLS regression guard: e2e spec asserting the home HTML stream is document-ordered (footer byte > content byte, no `$RC` move-script, no `<!--$?-->` boundary) + `scripts/cls-regression.mjs` gap-proxy harness (documented, manual/CI-optional) | `e2e/parity.spec.ts` (or new spec), `scripts/cls-regression.mjs` |
+| P3-F4 | 404 regression guard: e2e spec asserting bogus case slugs return 404 (+ the existing top-level 404 assertion stays) | `e2e/smoke.spec.ts` |
+| P3-F5 | CSP: allow the Cloudflare analytics beacon (`script-src` += `https://static.cloudflareinsights.com`) with a documented rationale — the deployment host's analytics is clearly operator-intended | `next.config.ts`, e2e header contract, docs |
+| P3-F6 | Dedupe `playwright-core` in `bun.lock` (single 1.63.0, no nested copy) → re-include `e2e` + `scripts` in `typecheck` (restore the documented contract) | `bun.lock`, `tsconfig.json` |
+| P3-F7 | Untrack `db/custom.db`, `.env`, `package-lock.json` (git rm --cached) + gitignore `package-lock.json` | git index, `.gitignore` |
+| P3-F8 | Create `docs/ssh_git_wrapper_v3.py` (SSH-key wrapper for `git push`) + `docs/how-to-git-push-using-ssh-wrapper_SKILL.md` (operator runbook) | new docs |
+| P3-F9 | Docs realignment: CLAUDE.md (Prisma/ADR-011, commands, counts), README.md (persistence, hierarchy, counts, CSP note, CF deployment notes), SKILL.md v2.2.0 (ADR-011/012, project_state 52 tests, stack table, env vars, §11 gates, lessons L14/L15, audit history pass 3), AGENTS.md (typecheck coverage true again, playwright 1.63.0, CSP note, db steps already present), PAD (playwright pin, ADR-012 reference) | 5 docs |
+| P3-F10 | Host-config recommendations documented (P3-10 email obfuscation OFF; verify CF analytics after P3-F5) | README/SKILL deployment notes |
+
+**Deferred with rationale:**
+- Header height 81 vs source 96 px — accepted pass-2 geometry (scroll-padding contract intact); changing it re-opens z-index/scroll audits for zero user value.
+- Responsive image variants (K-5) — ADR-006 accepted trade; host optimizer territory.
+- In-memory rate limiter (K-7) — accepted for scope; documented.
+
+## P3 validation against the codebase (pre-execution — all verified)
+
+1. **P3-F1/P3-F2 empirically validated** (sandbox probes, since reverted): removing `src/app/loading.tsx` → footer byte 6981→39496 (content 14861 precedes footer), gap-proxy CLS 0.3100→**0.0000** (3/3 runs), bogus-slug **200→404**; adding `dynamicParams = false` → bogus 404 + real slug 200; all static routes still prerender (20/20).
+2. **P3-F6 validated**: `bun.lock` root `playwright-core@1.62.0` + nested `playwright-core@1.63.0` confirmed; after dedupe `bun install --frozen-lockfile` passes and `tsc --noEmit` with `exclude: ["node_modules","skills"]` is clean (e2e + scripts included).
+3. **P3-F5**: `e2e/smoke.spec.ts` asserts CSP via `toContain` per-directive — adding the beacon origin only requires updating the docs' CSP transcription + the spec's expected string if it pins the full header (it does not — contains-checks only; verify during execution).
+4. **P3-F7**: `.gitignore` already lists `.env` and `/db/*.db`; CI (`verify-gate.yml`) provisions its own `.env` from `.env.example` — untracking both is CI-safe. `package-lock.json` is npm noise (bun.lock canonical); add ignore entry.
+5. **P3-F8**: remote `origin` is currently `https://github.com/nordeim/design-brand-strategy.git`; the wrapper must set/use the SSH remote `git@github.com:nordeim/design-brand-strategy.git` with `GIT_SSH_COMMAND` pointing at a 0600 key file.
+6. **P3-F9**: doc claims to reconcile were enumerated by direct read (P3-6 table); PAD already updated for 19 WebP images in `50c357f` — only the playwright pin + ADR-012 reference remain stale there.
+7. Gates green at baseline after the lockfile dedupe: lint ✓, typecheck ✓, 52/52 ✓, build 20 routes ✓, e2e:all 81/81 ✓.
+
+## P3 execution order (TDD — RED → GREEN per slice, full gate after each)
+
+1. **Slice A (P3-F1 + P3-F2 + guards):** RED — new e2e specs fail: bogus `/work/slug` expects 404 (gets 200); stream-order spec expects document-ordered HTML (gets shell-split with footer @ ~byte 6981). GREEN — delete `src/app/loading.tsx`; add `dynamicParams = false`. Verify: specs green, gap-proxy CLS 0.0000, full suite.
+2. **Slice B (P3-F5):** RED — extend `smoke.spec.ts` header contract to expect `cloudflareinsights.com` in `script-src` (fails against current CSP). GREEN — add the origin to `next.config.ts` CSP with rationale comment. Docs updated in Slice E.
+3. **Slice C (P3-F6):** already applied + validated (lockfile dedupe, tsconfig re-include). Gate: `tsc` with e2e/scripts included stays clean; `bun install --frozen-lockfile` passes.
+4. **Slice D (P3-F7 hygiene):** `git rm --cached db/custom.db .env package-lock.json`; gitignore `package-lock.json`; `git status` clean of unintended deletions (files remain on disk).
+5. **Slice E (P3-F8 + P3-F9 + P3-F10 docs):** create the SSH wrapper + runbook; realign CLAUDE.md, README.md, SKILL.md v2.2.0, AGENTS.md, PAD; document CF host recommendations (email obfuscation OFF, analytics verification).
+6. **Final verification:** lint → typecheck → test → build → e2e:all (expect 81 + new specs) + gap-proxy CLS harness + live-site re-probe of the fixed behaviors (bogus-slug 404 where deploy allows; header/CSP spot-check) + commit + push via the wrapper.
+
+## P3 risks & mitigations
+
+- **Removing loading.tsx changes navigation UX for slow dynamic renders** — all routes are static or near-instant (`/contact` reads only `searchParams`); prefetch makes nav instant. Monitor FCP/navigation timing in the final probe.
+- **CSP loosening** — one additional script origin, host-pinned and documented; frame-ancestors/object-src stay hard. If the operator later disables CF analytics, the directive is inert (harmless).
+- **Untracking `.env`** — deployment pipelines that clone the repo must `cp .env.example .env` (CI already does exactly this; documented in README deployment + wrapper runbook).
+- **`dynamicParams = false`** — if a future project is added without regenerating params, its page 404s at build time instead of rendering on demand: acceptable for an SSG-only contract (generateStaticParams is the single source of slugs), and `projects.test.ts` pins data-driven params.
+
+---
+
+# Pass 3 — Second Remediation Cycle: Execution Record (2026-09-14)
+
+Driven by `docs/AUDIT_CODE_REVIEW.md` § Pass 3 (tiered review + security audit). TDD per `skills/tdd`.
+
+| Step | RED evidence | GREEN change | Verification |
+|---|---|---|---|
+| R2-1 (AUD-1) rate-limit client-key hardening | `src/lib/rate-limit.test.ts` written first — 5 clientKey tests failed (cf-connecting-ip ignored; first-hop XFF keyed) | `clientKey()` trust order: `cf-connecting-ip` → **last** XFF hop (proxy-appended) → `x-real-ip` → `local`, with whitespace/empty handling | 10/10 rate-limit tests; full suite **62/62** (was 52); e2e contact specs unaffected (single-hop spoof pattern keys on itself) |
+| R2-2 (AUD-2) PII posture docs | (doc contract mismatch — SKILL §13 claimed "lengths and enums only") | SKILL §13 + `api/contact/route.ts` comment corrected: message body never logged; name/email/company/referral ARE logged as delivery-hook data and persist to SQLite — treat `contact_inquiry` lines as PII-bearing, bounded retention | Doc/code alignment re-verified |
+| R2-3 (AUD-3) deepmerge-ts advisory | — (accepted-risk, no code change) | Recorded in the audit report: transitive via `prisma` CLI → `@prisma/config` (exact pin 7.1.5); runtime `@prisma/client` has zero deps; no attacker-controlled config input | `bun audit` output + dep-chain analysis archived in audit |
+| R2-4 (AUD-4/5/6) | — | Documented-accepted (honeypot client-side by design; history residue synthetic-only; oversized-body parse-then-reject bounded by the fixed limiter) | Audit table |
+
+**Final gate after the second cycle:** lint ✅ · typecheck (e2e+scripts) ✅ · 62/62 unit ✅ · build 20 routes ✅ · 83/83 e2e ✅ · CLS harness 0.0000 ✅.

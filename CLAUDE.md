@@ -1,16 +1,16 @@
 ---
 IMPORTANT: File is read fresh for every conversation. Be brief and practical.
 project_type: nextjs
-version: 1.0.0
+version: 1.1.0
 framework_version: "16.3"
-last_updated: 2026-09-13
+last_updated: 2026-09-14
 ---
 
 # design-brand-strategy
 
-Editorial portfolio website for a designer & brand strategist persona — an original implementation of the reference site's information architecture and design language. Maintained by nordeim; pushed to `git@github.com:nordeim/design-brand-strategy.git`.
+Editorial portfolio website for a designer & brand strategist persona — an original implementation of the reference site's information architecture and design language. Maintained by nordeim; pushed to `git@github.com:nordeim/design-brand-strategy.git` (via `docs/ssh_git_wrapper_v3.py`, see `docs/how-to-git-push-using-ssh-wrapper_SKILL.md`).
 
-**Tech stack**: Next.js 16 (App Router), React 19, TypeScript 5.9 (strict), Tailwind CSS 4 (CSS-first), Vitest 4, Playwright 1.62 (e2e), zod 3, lucide-react. No database. No auth. Five client components total.
+**Tech stack**: Next.js 16 (App Router), React 19, TypeScript 5.9 (strict), Tailwind CSS 4 (CSS-first), Vitest 4, Playwright 1.63 (e2e), zod 3, lucide-react, Prisma 6.19 + SQLite (ADR-011, `ContactInquiry` persistence — fail-open). No auth. Five client components total.
 
 ## Foundational Principles
 
@@ -70,7 +70,9 @@ bun install            # bun is the package manager; bun.lock is committed
 bun run dev            # http://localhost:3000
 ```
 
-Node ≥ 20 / Bun ≥ 1.1. No database, no migrations, no env required to run locally (only `NEXT_PUBLIC_SITE_URL` affects metadata URLs).
+Node ≥ 20 / Bun ≥ 1.1. The only env that affects a local run: `DATABASE_URL`
+(`file:../db/custom.db`, provisioned by `cp .env.example .env && bun run db:push`)
+and `NEXT_PUBLIC_SITE_URL` (metadata URLs).
 
 ### Build Commands
 
@@ -80,20 +82,21 @@ Node ≥ 20 / Bun ≥ 1.1. No database, no migrations, no env required to run lo
 | `bun run build` | Production build (compiles + type-checks + prerenders 20 routes) |
 | `bun run start` | Serve production build (`-p <port>` to change) |
 | `bun run lint` | ESLint (next/core-web-vitals + react-hooks rules) |
-| `bun run typecheck` | `tsc --noEmit` |
+| `bun run typecheck` | `tsc --noEmit` — strict, covers `e2e/` specs and `scripts/` (tsconfig excludes only `node_modules` + `skills`) |
 | `bun run test` | Vitest unit tests |
 | `bun run test:coverage` | Coverage report |
 | `bun run e2e` | Playwright e2e — chromium project against the production build |
-| `bun run e2e:all` | Both projects (chromium + Pixel-7 mobile emulation) |
+| `bun run e2e:all` | Both projects (chromium + Pixel-7 mobile emulation) — 83 specs total |
 | `bun run e2e:report` | Open the Playwright HTML report |
+| `bun run db:generate` / `db:push` | Prisma client generation / SQLite schema push (ADR-011) |
 
 ## Testing Strategy
 
 ### Test Pyramid
 
-- **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema + option labels (`contact.test.ts`), data contracts (project aspect alternation, marquee shapes, process/FAQ data, image-path integrity — `src/data/*.test.ts`), sitemap determinism (`src/app/sitemap.test.ts`), and source-reading markup guards for the no-JS reveal fallback and skip link (`src/lib/reveal-guard.test.ts`).
+- **Unit (present)**: pure logic — estimator math (`estimator.test.ts`), contact schema + option labels (`contact.test.ts`), data contracts (project aspect alternation, marquee shapes, process/FAQ data, image-path integrity — `src/data/*.test.ts`), sitemap determinism (`src/app/sitemap.test.ts`), source-reading markup guards for the no-JS reveal fallback and skip link (`src/lib/reveal-guard.test.ts`), and the shared DATABASE_URL resolver contract (`src/lib/wcc/__tests__/db-url.test.ts`) — 62 tests / 8 files (incl. the rate-limit client-key trust order, AUD-1).
 - **Integration/API (pinned in e2e)**: the `POST /api/contact` contract (202 valid / 400 invalid with field errors / 429 over-limit with Retry-After) and route health run inside `e2e/contact.spec.ts` against the managed production webServer.
-- **E2E (present — 81 specs)**: Playwright suite in `e2e/` (config adapted from the home-financing reference): `smoke` (critical surfaces + security-header contract + axe critical gates), `seo` (sitemap/robots/title pins/per-case OG), `assets` (data-driven image inventory), `contact` (API contract + form funnel + honeypot), `estimator` (static-group wiring, gated estimate, deep-links), `parity` (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee motion contract, theme persistence), `mobile` (hamburger overlay, scroll lock, Escape focus return). Runs `next start` on :3002 — the shipped artifact, never dev HMR.
+- **E2E (present — 83 specs)**: Playwright suite in `e2e/`: `smoke` (critical surfaces + security-header contract incl. the Cloudflare-analytics script origin + axe critical gates + unknown-slug hard-404 + document-order HTML stream guard), `seo` (sitemap/robots/title pins/per-case OG), `assets` (data-driven image inventory), `contact` (API contract + form funnel + honeypot), `estimator` (static-group wiring, gated estimate, deep-links), `parity` (no-JS reveal opacity, skip-link keyboard reveal, aspect rhythm, marquee motion contract, theme persistence), `mobile` (hamburger overlay, scroll lock, Escape focus return). Runs `next start` on :3002 — the shipped artifact, never dev HMR. `scripts/cls-regression.mjs` (gap-proxy harness) guards the cold-load CLS contract (ADR-012).
 
 ### Test Commands
 
@@ -149,8 +152,8 @@ ESLint flat config (`eslint.config.mjs`) extends `next/core-web-vitals`; the `re
 ### Error Handling Approach
 
 - API routes validate input authoritatively (zod) and return structured errors: `{ ok: false, errors: {field: message} }` with correct status codes (400/429). The client maps these onto the same field-error contract it computes locally.
-- Route-level boundaries: `app/error.tsx` (client reset panel), `app/not-found.tsx`, `app/loading.tsx`.
-- Fail fast on programmer error: estimator throws `RangeError` on unknown ids (the UI can only emit valid ids).
+- Route-level boundaries: `app/error.tsx` (client reset panel), `app/not-found.tsx`. There is deliberately NO root `app/loading.tsx`: a root loading boundary splits the HTML stream into shell-then-content, which caused a measured cold-load CLS 0.31 and soft-404 (200) responses on the live deploy (ADR-012) — the e2e stream-order guard pins this.
+- Fail fast on programmer error: estimator throws `RangeError` on unknown ids (the UI can only emit valid ids); `/work/[slug]` is SSG-only (`dynamicParams = false`) so unknown slugs hard-404.
 
 ### Debugging
 
@@ -179,19 +182,29 @@ Data flows down; events (form submit, theme toggle, estimator choices) stay in t
 
 ### API Design
 
-- `POST /api/contact`: 202 on success (accepted — async semantics), 400 with field errors, 429 with `Retry-After`. Rate limit: 5 / 10 min / IP, in-memory bounded map.
+- `POST /api/contact`: 202 on success (accepted — async semantics), 400 with field errors, 429 with `Retry-After`. Rate limit: 5 / 10 min / IP, in-memory bounded map. Validated inquiries are persisted to SQLite via Prisma (fail-open) and emitted as a structured log line.
 - `GET /api/health`: `{ ok, service, uptimeSeconds }`, `Cache-Control: no-store`.
 - No other endpoints; no auth anywhere (public marketing site).
 
 ### Data Layer
 
-None, intentionally (see PAD ADR-002). Validated inquiries emit a structured JSON log line — that console.info call is the integration point for email/CRM delivery in production.
+SQLite via Prisma 6.19 (ADR-011, superseding the original no-DB ADR-002): a single
+`ContactInquiry` model mirrors `contactSchema` 1:1; `src/lib/db.ts` is the runtime
+singleton and `scripts/db.ts` the CLI wrapper — both share the `DATABASE_URL`
+resolver (`src/lib/wcc/db-url.ts`) so the CLI, dev server, and standalone runtime
+land on the same `db/custom.db` file. Editorial content stays content-as-code in
+`src/data/`. The DB write is fail-open: a DB error logs `contact_inquiry_db_failed`
+and still returns 202; the structured `contact_inquiry` log remains the delivery
+integration point for email/CRM.
 
 ### Environment Variables
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `NEXT_PUBLIC_SITE_URL` | Canonical URL for metadataBase, sitemap, robots | `https://elenavance.com` |
+| `NEXT_PUBLIC_SITE_URL` | Canonical URL for metadataBase, sitemap, robots | `https://design-brand-strategy.jesspete.shop` |
+| `SITE_URL` | Server-only fallback for the same (read once in `src/data/site.ts`) | same |
+| `DATABASE_URL` | SQLite URL for Prisma — relative `file:../db/custom.db` re-anchored by the shared resolver | `file:../db/custom.db` |
+| `E2E_PORT` / `E2E_BASE_URL` | Optional Playwright webServer overrides | `3002` / full URL |
 
 ## Anti-Patterns to Avoid
 

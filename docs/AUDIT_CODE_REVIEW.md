@@ -132,3 +132,53 @@ Nits (non-blocking): `.first()` used for the availability-pill assertion (would 
 - **Aesthetic/UX rigor:** the redesign *removes* a divergence (boxed estimator) the VLM flagged and preserves the source's editorial grammar (numbered groups, uppercase practice lines, minimal cards). The Anti-Generic litmus passes: every visual decision traces to a measured source pattern, not a template default.
 
 **Deferred (documented):** WebKit e2e project; awards-row arrangement; CI pipeline for the suite.
+
+---
+
+# Pass 3 — Tiered Code Review + Security Audit (2026-09-14, third session)
+
+**Scope:** post-remediation-pass-3 codebase (ADR-011 Prisma SQLite + ADR-012 document-order stream + CSP beacon origin + lockfile dedupe). **Method:** per `skills/code-quality-standards` (Six-Axis review) + `skills/security-and-hardening` (boundary/injection/header discipline) + `skills/code-review-checklist`; four tiers — Tier 0 documented-contract verification, Tier 1 mechanical gates + structural invariants, Tier 2 Six-Axis source review (every file under `src/`, `e2e/`, `scripts/`, configs), Tier 3 security audit with live runtime probes. **Question asked:** *does the codebase match its documented contracts (AGENTS/CLAUDE/README/SKILL/PAD) and is it safe to ship?*
+
+## Tier 0 — Documented contracts: **MATCH** (post-pass-3 realignment)
+
+Every contract claim re-verified against code: 52/52 unit (7 files incl. `db-url` resolver), 83/83 e2e, typecheck covers `e2e/` + `scripts/` (tsconfig excludes only `node_modules`+`skills`), playwright 1.63.0 single-copy playwright-core, CSP transcription in AGENTS/SKILL matches `next.config.ts` byte-for-byte, "no root loading.tsx" (ADR-012) matches the tree, `dynamicParams = false` present with the documented rationale, Prisma fail-open write matches ADR-011, all five docs cross-consistent on counts/versions/commands.
+
+## Tier 1 — Mechanical gates: **ALL GREEN**
+
+lint ✅ · typecheck (incl. e2e+scripts) ✅ · 52/52 ✅ · build 20 routes ✅ · 83/83 e2e ✅ · CLS harness 0.0000 ✅ · structural invariants: upward imports 0, radius violations 0, shadows 0 (one prose hit in an alt text — false positive), raw colors in tsx 0, `use client` = 5 files, images = 19 WebP, png refs 0, TS/lint suppressions 0, secrets scan clean, key-material scan clean (only doc/validation marker strings).
+
+## Tier 2 — Six-Axis source review: **Approve** (nits below)
+
+| Axis | Verdict | Evidence |
+|---|---|---|
+| Correctness | Approve | All 19 source files read. API contract machine-pinned (202/400/429/405); estimator fail-fast guarded by `complete` before the call; rate limiter bounded with sweep-at-cap; resolver contract-tested (8 tests); no suppressions anywhere. Nit: estimator narrows via `as` casts after the `complete` guard — safe but type-predicate narrowing would be tidier. |
+| Readability | Approve | Comments explain *why* (parity measurements, ADR pointers); data-driven renderers (OPTION_SETS); naming consistent with the domain vocabulary of the docs. |
+| Architecture | Approve | Four-layer rule intact (grep-verified both directions); exactly 5 client components; one sanctioned lib→data import set; new `scripts/` + `docs/` artifacts sit outside the dependency graph. |
+| Security | See Tier 3 | One Medium (AUD-1 rate-limit key spoofability), one Low (AUD-2 doc/code PII wording drift); the rest pass. |
+| Performance | Approve | CLS contract now pinned (ADR-012); images aspect-reserved; marquee pure-CSS; no N+1 (single-row Prisma create); limiter O(1). |
+| Aesthetic/UX rigor | Approve | Token contract intact (greps); Anti-Generic litmus passes — every visual decision traces to a measured source pattern or an ADR; no template clichés introduced by pass 3. |
+
+## Tier 3 — Security audit (severity-ranked, with evidence)
+
+| ID | Severity | Finding | Evidence | Disposition |
+|---|---|---|---|---|
+| AUD-1 | **Medium** | Rate-limit client key is spoofable behind Cloudflare: `clientKey()` reads the **first** `x-forwarded-for` entry. A client can send forged first-hop values and obtain unlimited 5-per-10-min buckets, defeating the limiter (honeypot AUD-4 then also weakens). `cf-connecting-ip` — which Cloudflare overwrites and clients cannot forge — is ignored. | Code (`rate-limit.ts:35-38`) + probe P4: seven requests with seven forged first-hop IPs → 7×202; probe P5: same-IP 6th request → 429 (limiter itself works). Live deploy is CF-fronted. | **Fix now (R2-1, TDD)** — prefer `cf-connecting-ip`, then the **last** XFF entry (the proxy-appended hop), then `x-real-ip`, then `local`. Single-hop spoofed XFF (the e2e isolation pattern) remains the last entry → all 83 specs stay valid. |
+| AUD-2 | Low | Doc/code drift on the PII logging posture: SKILL §13 says the API logs "lengths and enums, not free text", but the `contact_inquiry` log line includes `name` + `email` (deliberately — it is the documented delivery hook; ADR-011 also persists the same PII to SQLite). The posture claim is inaccurate and PII now exists in two sinks. | `api/contact/route.ts:68-83`; SKILL §13 Security bullet | **Fix docs now (R2-2)** — state the true posture: message body never logged (`messageLength`), name/email logged as delivery-hook data; add log-retention guidance. |
+| AUD-3 | Low | `deepmerge-ts@7.1.5` carries a HIGH advisory (GHSA-ggr8-5vv4-36mx, stack exhaustion on recursive merges). Transitive only: `prisma` (devDep CLI) → `@prisma/config` → **exact-pinned** `deepmerge-ts@7.1.5`; runtime `@prisma/client` has **zero dependencies**; no attacker-controlled config merging in our usage. | `bun audit`; dependency-chain inspection | **Accept + document (R2-3)** — an override would force Prisma's exact internal pin (riskier than the advisory); monitor for the Prisma bump. |
+| AUD-4 | Info | Honeypot is client-side only: a direct POST with `website` filled and otherwise-valid fields still persists (zod strips unknown keys). Documented design; the limiter is the bound — see AUD-1. | `contact-form.tsx:33-38`; schema has no `website` field | Documented accepted; AUD-1's fix restores the intended bound. |
+| AUD-5 | Info | `.env` + `db/custom.db` remain in git **history** (untracked in the working tree by pass 3). Contents verified: env template with public URLs (no secrets) and 27 synthetic test rows (no real PII). History rewrite rejected — operator no-force-push contract. | `git log --all -- .env db/custom.db` → `50c357f` | Accepted residual, recorded. |
+| AUD-6 | Info | Route handlers parse the JSON body before zod rejects oversized strings (2.5MB probe → clean 400, no crash). No built-in body cap; realistic abuse is bounded by the (AUD-1-fixed) limiter. | Probe P2 | Accepted; revisit only if the endpoint grows. |
+| AUD-7 | Pass | Security headers exact on local build and live (CSP incl. the CF analytics origin — deliberate, documented; HSTS preload; XFO DENY; nosniff; Referrer/Permissions-Policy); robots disallows `/api/`. | smoke.spec contract; live curl | — |
+| AUD-8 | Pass | No secrets or key material in tree; `dangerouslySetInnerHTML` only for the fixed theme script; React auto-escaping on all user-adjacent text; Prisma parameterizes by construction; CI workflow `permissions: contents: read` + frozen lockfile. | Tier 1 scans; `.github/workflows/verify-gate.yml` | — |
+| AUD-9 | Pass | `/api/contact` method discipline (PUT/GET → 405); malformed JSON → 400; zod caps every string; 429 + `Retry-After: 600` on the 6th same-key request; SQLite file lives outside `public/` (not web-servable). | Probes P1–P5; tree inspection | — |
+
+## Verdict
+
+**Safe to ship** after R2-1 (rate-limit key fix, TDD) and R2-2 (PII posture doc fix): zero Critical/High *runtime* vulnerabilities; one Medium hardening gap behind the edge (AUD-1) with a tested fix path; contracts Tier 0–2 fully aligned post-pass-3. The remediation backlog below feeds the pass-3 second remediation cycle.
+
+## Remediation backlog (second cycle of pass 3)
+
+1. **R2-1 (AUD-1, TDD):** `clientKey()` — `cf-connecting-ip` → last XFF entry → `x-real-ip` → `local`. RED: unit tests for each header combination (incl. "spoofed, real" chain → must key on `real`). GREEN: implement; full gate + confirm 83/83 e2e (single-hop spoof pattern unaffected).
+2. **R2-2 (AUD-2):** correct the PII-posture wording in SKILL §13 + route comment; add retention guidance ("treat logs containing `contact_inquiry` as PII-bearing; drain to a bounded-retention sink").
+3. **R2-3 (AUD-3):** record the accepted-risk analysis in the audit (done, above) + a `bun audit` step note in SKILL §11 as a periodic (not per-ship) check.
+4. **R2-4 (AUD-4/5/6):** documented-accepted, no code change.

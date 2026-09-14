@@ -3,15 +3,16 @@ name: design-brand-strategy
 description: >
   Comprehensive engineering skill for the Elena Vance editorial portfolio
   codebase (Next.js 16 App Router + React 19 + Tailwind CSS 4, CSS-first
-  tokens, no database). Use when extending, debugging, auditing, onboarding
-  onto, or remediating this codebase — or when replicating its architecture
-  for another editorial marketing site. Captures the design system contract,
-  component architecture, content-as-code data layer, accessibility
-  implementation, anti-patterns, debugging procedures, and hard-won lessons
-  from the build and every subsequent remediation pass.
-version: 2.1.0
-last_updated: 2026-09-13
-project_state: 44/44 unit tests green · 81/81 Playwright e2e specs green · tsc --noEmit clean · eslint clean · next build 20 routes · main @ post-remediation pass 2 (see Appendix B)
+  tokens, Prisma SQLite persistence for contact inquiries). Use when
+  extending, debugging, auditing, onboarding onto, or remediating this
+  codebase — or when replicating its architecture for another editorial
+  marketing site. Captures the design system contract, component
+  architecture, content-as-code data layer, accessibility implementation,
+  anti-patterns, debugging procedures, and hard-won lessons from the build
+  and every subsequent remediation pass.
+version: 2.2.0
+last_updated: 2026-09-14
+project_state: 62/62 unit tests green · 83/83 Playwright e2e specs green · tsc --noEmit clean (covers e2e/ + scripts/) · eslint clean · next build 20 routes · main @ post-remediation pass 3 (see Appendix B)
 ---
 
 # design-brand-strategy — Engineering SKILL
@@ -34,6 +35,8 @@ project_state: 44/44 unit tests green · 81/81 Playwright e2e specs green · tsc
 > **v2.0.0 change log:** documents the codebase after remediation pass 1 (2026-09-13 audit → fix cycle): mixed-aspect editorial image rhythm (ADR-008), fail-open no-JS reveal guards (ADR-007), WebP assets (ADR-006 revision), services process/FAQ/CTA sections, skip link + select-error a11y wiring, estimator DRY refactor, per-page OG images, deterministic sitemap stamps. New lessons L9–L12; audit history in Appendix B.
 >
 > **v2.1.0 change log:** adds the Playwright e2e layer (ADR-009, 81 specs) and the pass-2 parity redesign (ADR-010): static four-group estimator with gated estimate, /work closing CTA band, portrait 4:5 + uniform 7:3 case heroes, 3-column home-services and about-approach grids, text-left/portrait-right home/about heroes, 5-step horizontal process, minimal card meta grammar, source-range marquee shapes, single-column contact fields (form left / info right), referral select, timeline labels with durations. New lesson L13.
+>
+> **v2.2.0 change log:** documents the codebase after remediation pass 3 (2026-09-14 live-site validation → fix cycle): ADR-011 (Prisma SQLite `ContactInquiry` persistence, fail-open) folded in; ADR-012 (document-order HTML stream — root loading boundary removed after the measured cold-load CLS 0.31 + soft-404 on the live deploy); `/work/[slug]` `dynamicParams = false`; CSP allows the Cloudflare analytics beacon origin; playwright-core deduped (1.63.0, Chromium 153) so typecheck again covers e2e/ + scripts/; git hygiene (db/custom.db, .env, package-lock.json untracked); `scripts/cls-regression.mjs` + `scripts/gap-proxy.mjs` CLS harness; `docs/ssh_git_wrapper_v3.py` + push runbook. New lessons L14–L15.
 
 ## Table of Contents
 
@@ -69,7 +72,8 @@ project_state: 44/44 unit tests green · 81/81 Playwright e2e specs green · tsc
 brand strategist ("Elena Vance", New York) — a five-page marketing site with a
 static four-group investment estimator (gated estimate) and a validated
 contact form, built as a fully static Next.js 16 application with two API
-routes, verified by 44 unit tests and an 81-spec Playwright e2e suite.
+routes, verified by 62 unit tests and an 83-spec Playwright e2e suite,
+with contact inquiries persisted to a single SQLite table (ADR-011).
 
 **The design thesis: warm editorial print.** The site behaves like a
 well-set magazine: a cream paper background, near-black ink, a display serif
@@ -135,10 +139,12 @@ carousels, `text-gray-500`-style default grays, Inter-for-headlines,
 of those is a rejected cliché; the reference aesthetic is a printed
 portfolio you can almost feel.
 
-**What this project deliberately is NOT:** no database (ADR-002), no auth,
-no CMS, no animation library, no component library (no shadcn/Radix), no
-analytics, no i18n, no Docker. (Testing, by contrast, is deliberately
-rich: 44 unit tests + an 81-spec Playwright e2e suite — ADR-009.)
+**What this project deliberately is NOT:** no auth, no CMS, no animation
+library, no component library (no shadcn/Radix), no analytics scripts of our
+own, no i18n, no Docker. (Persistence is deliberately minimal: one SQLite
+table for contact inquiries — ADR-011; editorial content remains code.
+Testing, by contrast, is deliberately rich: 62 unit tests + an 83-spec
+Playwright e2e suite — ADR-009.)
 See Appendix A for the rationale of each.
 
 ---
@@ -158,22 +164,25 @@ lockfile). **Never downgrade or float these without re-running the full
 | Validation | `zod` | **3.25.76** | One schema (`contactSchema`) enforced at two boundaries (client inline + API authoritative) — ADR-004. |
 | Icons | `lucide-react` | **1.45.0** | Only `Menu`, `X`, `Sun`, `Moon`, `ArrowRight`, `ChevronDown` are used. Tree-shaken; no icon fonts. |
 | Language | `typescript` | **5.9.3** | `strict: true`, `noEmit`, `moduleResolution: "bundler"`, path alias `@/* → ./src/*`. |
-| Tests | `vitest` | **4.1.11** | `environment: "node"`, includes `src/**/*.test.ts`. 44 tests / 6 files — pure functions, data contracts, and source-reading guards. No jsdom. |
-| E2E | `@playwright/test` | **1.62.0** | 81 specs in `e2e/` (7 files) + `@axe-core/playwright` 4.13.0. Chromium + Pixel-7 projects against the production build (`next start` :3002). Pinned to 1.62.0 to match the cached Chromium 151; bun.lock locks it. |
+| Tests | `vitest` | **4.1.11** | `environment: "node"`, includes `src/**/*.test.ts`. 62 tests / 8 files — pure functions, data contracts, source-reading guards, the DATABASE_URL resolver contract, and the rate-limit client-key trust order. No jsdom. |
+| E2E | `@playwright/test` | **1.63.0** | 83 specs in `e2e/` (7 files) + `@axe-core/playwright` 4.13.0. Chromium (153) + Pixel-7 projects against the production build (`next start` :3002). bun.lock locks it — keep `playwright-core` deduped at exactly one copy (a stale 1.62.0 root copy once forced a nested 1.63.0 and broke `tsc` on the specs). |
+| Persistence | `prisma` + `@prisma/client` | **6.19.3** | One `ContactInquiry` model (SQLite `db/custom.db`, ADR-011). Shared `DATABASE_URL` resolver `src/lib/wcc/db-url.ts` (CLI + runtime + standalone); `src/lib/db.ts` runtime singleton; `scripts/db.ts` CLI wrapper behind `db:generate`/`db:push`. |
 | Lint | `eslint` + `eslint-config-next` | **9.39.5** / 16.3.4 | Flat config (`eslint.config.mjs`) extending `eslint-config-next/core-web-vitals`. |
 | Package manager | bun | (host) | `bun install`, `bun run <script>`. `trustedDependencies: ["unrs-resolver"]` — the only postinstall allowed to run. |
-| Database | — | — | None by decision (ADR-002). Content is TypeScript data files. |
+| Database | SQLite via Prisma | 6.19.3 | Contact inquiries only (ADR-011 supersedes ADR-002); editorial content stays TypeScript data files. |
 | Runtime | Node / Bun | 20+ | `next start` or any Node host; nothing platform-specific. |
 
-**Environment variables — exactly one:**
+**Environment variables:**
 
 | Variable | Scope | Default | Purpose |
 |---|---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | public | `http://localhost:3000` | Canonical origin for metadata `metadataBase`, sitemap URLs, robots sitemap pointer. Read once in `src/data/site.ts` (`process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"`). |
+| `NEXT_PUBLIC_SITE_URL` | public | `http://localhost:3000` | Canonical origin for metadata `metadataBase`, sitemap URLs, robots sitemap pointer. Read once in `src/data/site.ts` (`process.env.NEXT_PUBLIC_SITE_URL ?? SITE_URL ?? "http://localhost:3000"`). |
+| `SITE_URL` | server | — | Server-only fallback for the same value (deploy pattern: set both to the live origin). |
+| `DATABASE_URL` | server | `file:../db/custom.db` (from `.env.example`) | SQLite URL for Prisma. Relative `file:` URLs ending in `db/custom.db` are re-anchored to an absolute repo-root path by `src/lib/wcc/db-url.ts`, shared by the runtime (`src/lib/db.ts`), the CLI wrapper (`scripts/db.ts`), and the standalone output. |
+| `E2E_PORT` / `E2E_BASE_URL` | build | `3002` / — | Playwright webServer overrides; `E2E_BASE_URL` reuses an external server (e.g. the live deploy) instead of starting one. |
 
-There is no zod env schema — a single public URL var does not justify one,
-and the `??` fallback means builds never fail on a missing env (see §13 for
-why that is the intended trade).
+There is no zod env schema — the `??` fallbacks mean builds never fail on a
+missing env (see §13 for why that is the intended trade).
 
 **Rendering strategy:** fully static where possible. `/`, `/about`,
 `/services`, `/work`, and all 8 `/work/[slug]` pages are prerendered
@@ -185,7 +194,7 @@ still used for layout discipline, but optimization is delegated to the host.
 
 **Repo facts an agent should internalize:**
 - 3,233 lines of TS/TSX/CSS across 33 source files under `src/`.
-- 15 generated original images in `public/images/` (~2.5 MB total, PNG).
+- 19 generated original images in `public/images/` (~2.4 MB total, WebP).
 - Git: `main` only, no feature branches by operator contract; remote is
   `git@github.com:nordeim/design-brand-strategy.git`.
 
@@ -210,12 +219,13 @@ Quality gates (the only commands you ever need — all wired in `package.json`):
 
 ```bash
 bun run lint        # eslint .            — flat config, core-web-vitals
-bun run typecheck   # tsc --noEmit        — strict (covers e2e/ specs too)
-bun run test        # vitest run          — 44 tests, node environment
+bun run typecheck   # tsc --noEmit        — strict (covers e2e/ + scripts/)
+bun run test        # vitest run          — 62 tests, node environment
 bun run build       # next build          — 20 routes
-bun run e2e         # playwright chromium — 76 specs against the built artifact
-bun run e2e:all     # + Pixel-7 mobile    — 81 specs total (serial workers)
+bun run e2e         # playwright chromium — 78 specs against the built artifact
+bun run e2e:all     # + Pixel-7 mobile    — 83 specs total (serial workers)
 bun run start       # next start          — prod server (use -p 3001 when 3000 is busy)
+bun scripts/cls-regression.mjs   # CLS guard — worst CLS <= 0.1 (ADR-012)
 ```
 
 **Configuration file map** (each is small; read it before editing):
@@ -535,7 +545,7 @@ unit test when the hook contains logic worth testing (pure logic belongs in
 
 ## 7. Content Management (Content-as-Code)
 
-There is no CMS and no database (ADR-002). All content is TypeScript in
+There is no CMS (ADR-002 for editorial content). All content is TypeScript in
 `src/data/`, typed `as const`, and imported at build time. Editors change
 data files; designers change components; neither touches the other's files.
 
@@ -746,7 +756,7 @@ behavior ($33k–$55k default → $44k–$88k). Lesson L11.
 | K-5 | Medium | ~2.4 MB imagery with no responsive variants (ADR-006 trade; WebP pass landed with a measured ~9% gain — an optimizer host can do better) | `public/images/` |
 | K-7 | Low | In-memory rate limiter resets per process/serverless instance (accepted for scope; swap for Upstash/Redis if deployed multi-instance) | `rate-limit.ts` |
 | K-9 | Low | Marquee `figcaption` labels render visibly on the duplicated loop half (intended seam aesthetic; aria-hidden handles AT) | `marquee.tsx` |
-| K-10 | Low | No CI pipeline — the §11 gates and probe scripts are local-first by scope | repo |
+| K-10 | ~~No CI pipeline~~ RESOLVED (pass 3 state): `.github/workflows/verify-gate.yml` runs the documented gate on every push (lint → typecheck → test → build → e2e, DB provisioned from `.env.example`) | repo |
 
 Resolved in pass 1: K-1 (no-JS reveal → ADR-007), K-2 (email single-source),
 K-3 (select wiring), K-4 (estimator DRY), K-6 (skip link), K-8 (per-page OG
@@ -826,9 +836,10 @@ repo's history (B-1, B-2, L7).
 ```bash
 bun run lint        # 1. eslint . — zero warnings tolerated
 bun run typecheck   # 2. tsc --noEmit — strict (includes e2e/ specs)
-bun run test        # 3. vitest run — 44/44 (count grows with new tests)
+bun run test        # 3. vitest run — 62/62 (count grows with new tests)
 bun run build       # 4. next build — expect "20 routes" / 0 errors
-bun run e2e:all     # 5. playwright — 81/81 against the fresh production build
+bun run e2e:all     # 5. playwright — 83/83 against the fresh production build
+bun scripts/cls-regression.mjs   # 6. cold-load CLS guard — worst CLS <= 0.1 (ADR-012)
 ```
 
 **5. Structural invariants** (copy-paste):
@@ -910,8 +921,9 @@ to recompute from the algorithm (30 000×1.716 → 51 480 → **51 000**, and
 and encode that. Never edit code to match a remembered number without
 re-deriving it.
 
-**L8. Document the deliberate absences.** "No database, no animation
-library, no component library" is load-bearing architecture (ADR-002, §1).
+**L8. Document the deliberate absences.** "No animation library, no
+component library, no CMS" is load-bearing architecture (ADR-002 for
+content-as-code, §1).
 Every future agent's instinct will be to add them; the docs (README, PAD,
 this file) exist to say *why not* with reasons, so the decision is
 re-argued on merits, not undone by default.
@@ -956,6 +968,33 @@ mapped to a number. When replicating a design, extract geometry
 from the running page — screenshots and VLM verdicts are useful triage, but
 numbers are the contract. And after fixing, re-probe: the shipped fix is
 only real when the measurement matches.
+
+**L14. Streaming SSR shape is a layout-stability contract — measure it at
+the byte level.** The live deploy showed cold-load CLS 0.31 (~50–75% of
+loads) that local runs never reproduced: Next 16 emits the layout shell
+(header + loading fallback + **footer**) before the streamed page content
+(`<!--$?-->` placeholder + hidden segment + `$RC` move-script), and Chrome
+paints the partial shell during delivery gaps — the footer then jumps
+~5400px when content lands. Removing the root `loading.tsx` restored
+document-order streaming (footer byte 6981 → 39496) and dropped CLS to
+0.0000, verified with a gap-proxy harness (`scripts/cls-regression.mjs`)
+that replays the HTML with a 300ms mid-stream pause. The same split also
+turned streamed `notFound()` into 200-status soft-404s with a 1-year CDN
+cache directive. General rules: (a) e2e specs must assert HTTP **status**,
+not just rendered recovery UI; (b) any layout element that follows streamed
+content (a footer) is a CLS liability — pin the stream order in a spec; (c)
+reproduce network-dependent bugs with deterministic delivery simulation,
+not throttle-only emulation.
+
+**L15. Kill your servers by port, not by name — stale servers poison
+measurements.** During the CLS investigation a `pkill -f "next start"`
+silently failed (the serving process renames itself to `next-server`), so
+"remove loading.tsx and rebuild" was measured against the OLD build for two
+rounds and the fix looked ineffective. `next start` children must be killed
+by listening port (`ss -ltnp` → PID → `kill -9`) or by PID captured at
+spawn. Symptom to remember: `EADDRINUSE` in the server log while a fresh
+`next start` claims to be serving. Any "fix didn't work" conclusion after a
+server restart deserves a port-level verification first.
 
 ---
 
@@ -1020,10 +1059,16 @@ reviewing changes; pairs with §16.)
 - Don't bypass `contactSchema` ("just this one field") → every mutation of
   the form contract goes through the shared schema (ADR-004) and updates
   both consumers + tests in the same change.
-- Don't log full message bodies → the API logs lengths and enums, not free
-  text (`messageLength`), a deliberate PII posture.
-- Don't trust `x-forwarded-for` as identity → `clientKey()` is best-effort
-  rate-limit keying only (K-7).
+- Don't log full message bodies → the API logs the message LENGTH
+  (`messageLength`) plus the name, email, company, enums, and referral — the
+  log line is the documented delivery hook, so contact PII appears in BOTH
+  the structured log and the SQLite row (ADR-011). Treat `contact_inquiry`
+  log lines as PII-bearing: drain them to a bounded-retention sink and never
+  mirror them into client-visible surfaces.
+- Don't trust `x-forwarded-for` first hops as identity → `clientKey()`
+  prefers `cf-connecting-ip` (edge-overwritten, unforgeable) and otherwise
+  keys on the LAST forwarded hop — the proxy-appended value (AUD-1). Still
+  best-effort rate-limit keying only (K-7), never an auth boundary.
 
 **Performance**
 - Don't `import` from `lucide-react` barrel in a way that pulls the icon
@@ -1439,13 +1484,14 @@ type ContactPageProps = { searchParams: Promise<{ service?: string }> };
 
 ## Appendix A: Architecture Decision Records
 
-Ten ADRs govern this codebase (full narratives in
-`Project_Architecture_Document.md` §1; the SKILL-level summary):
+Twelve ADRs govern this codebase (full narratives in
+`Project_Architecture_Document.md` §1 + `docs/ADR-011-prisma-sqlite.md`; the
+SKILL-level summary):
 
 | ADR | Decision | One-line rationale | What it forbids |
 |---|---|---|---|
 | ADR-001 | Next.js 16 App Router | Hybrid static site + two API routes; RSC-first | Pages Router, client-side rendering by default |
-| ADR-002 | No database — content-as-code | 8 projects + 6 services change monthly at most; TS data files are typed, diffable, zero-infra | Adding a DB/CMS "for flexibility" |
+| ADR-002 | No database — content-as-code (SUPERSEDED by ADR-011 for persistence) | 8 projects + 6 services change monthly at most; TS data files are typed, diffable, zero-infra | Migrating editorial `PROJECTS`/`SERVICES` into a DB/CMS |
 | ADR-003 | Tailwind 4 CSS-first tokens + class-based dark mode | Single source of design truth in `globals.css`; zero-config | `tailwind.config.ts`, `dark:`-hardcoded colors |
 | ADR-004 | One zod schema, two enforcement points | Client UX + server authority from one contract | Boundary-local validation logic |
 | ADR-005 | Deterministic rendering wherever hydration can observe | Seeded char block; theme class only mutation, `suppressHydrationWarning` only on `<html>` | `Math.random`/`Date.now` in render paths |
@@ -1454,6 +1500,8 @@ Ten ADRs govern this codebase (full narratives in
 | ADR-008 | Mixed-aspect editorial rhythm as data | Image orientation is a content decision — typed, tested fields drive render classes | CSS `nth-child` aspect tricks; uniform thumbnail grids |
 | ADR-009 | Playwright e2e layer on the production artifact | Parity/a11y/API contracts only count if a machine re-checks them; validate the built app, not dev HMR | Manual-only verification; parallel workers racing rate-limit state |
 | ADR-010 | Pass-2 parity redesign (static estimator + measured geometry) | Every layout fix maps to a measured source-site fact; design-language parity is fixed, content richness is kept | Re-imagining source interactions (the wizard assumption); trusting DOM order over rendered geometry |
+| ADR-011 | Prisma SQLite for `ContactInquiry` persistence (fail-open) | Inquiries durable and queryable; the structured log remains the email/CRM hook; shared `DATABASE_URL` resolver keeps CLI/runtime/standalone on one file | A second table without a new ADR; DB-as-CMS for editorial content; non-fail-open DB writes |
+| ADR-012 | Document-order HTML stream (no root loading boundary) | A root `loading.tsx` makes Next 16 stream shell (incl. footer) before content — measured cold-load CLS 0.31 + streamed-notFound soft-404s on the live deploy; document-order streaming removes both | Root/near-root `loading.tsx`; e2e specs asserting recovery UI without HTTP status; trusting dev-server CLS over gap-simulated cold loads |
 
 ## Appendix B: Audit History
 
@@ -1466,6 +1514,9 @@ Ten ADRs govern this codebase (full narratives in
 | Playwright e2e suite | 2026-09-13 | `playwright.config.ts` adapted from the home-financing reference + 7 spec files (80 specs at introduction) | All green on the production build; every parity fix from pass 1 gained a named regression guard (ADR-009) |
 | Pass-2 verification audit | 2026-09-13 | agent-browser re-probe of both sites (rendered geometry), 10 fresh screenshots, VLM pairwise re-review | Pass-1 fixes all hold; 14 new measured findings (F-1 /work CTA band, F-2 estimator interaction model, F-3/F-14 contact layout, F-4/F-5 aspect/hero geometry, F-6..F-9 hero/grid compositions, F-10 card grammar, F-11 marquee mix, F-12/F-13 label/referral parity) — see `docs/AUDIT_VISUAL_PARITY.md` § Pass 2 |
 | Remediation pass 2 (TDD) | 2026-09-13 | estimator spec rewritten RED first → static four-group estimator + gated estimate → layout geometry fixes → /work CTA → 5-step process → card grammar + marquee shapes | 12/12 in-scope findings closed; 44 unit + 81 e2e green; re-probes match source measurements exactly (1.6/0.8 rhythm, 2.33 hero, form x=64 / info x=859, 3-col grids at x=64/461/859) — see `docs/REMEDIATION_PLAN.md` § Pass 2 |
+| ADR-011 acceptance (Prisma SQLite) | 2026-09-13 | `ContactInquiry` model + shared `DATABASE_URL` resolver + fail-open API write + CI DB provisioning | 52/52 unit (was 44), build + e2e green — see `docs/ADR-011-prisma-sqlite.md` |
+| Pass 3 — live-site validation + remediation (TDD) | 2026-09-14 | 81/81 e2e run against the live deploy; CWV/CLS probing; VLM + geometry parity re-audit vs the source; docs/hygiene alignment audit post-`50c357f` | RED→GREEN: root loading boundary removed (ADR-012 — CLS 0.31→0.0000 via gap-proxy harness, soft-404 200→404), `dynamicParams=false`, CSP + CF analytics origin, playwright-core dedupe (typecheck covers e2e again), git hygiene (db/custom.db/.env/package-lock untracked), SSH push tooling; 52 unit + 83 e2e green — see `docs/REMEDIATION_PLAN.md` § Pass 3 |
+| Pass 3 — tiered code review + security audit (2nd cycle, TDD) | 2026-09-14 | Six-Axis review of all sources + OWASP-style probes (methods, malformed/oversized bodies, rate-limit spoofing, secret/key scans, dep audit) — `docs/AUDIT_CODE_REVIEW.md` § Pass 3 | 0 Critical; AUD-1 rate-limit client-key hardened (cf-connecting-ip → last XFF hop; 10 new unit tests, 62/62) ; AUD-2 PII posture docs corrected; AUD-3 deepmerge-ts accepted-risk recorded (CLI-only transitive); safe-to-ship verdict |
 
 ## Appendix C: Post-Deploy Live-Site Validation
 
@@ -1495,7 +1546,10 @@ marquee seam behavior, CSP in effect, API latency. The protocol:
 7. **The reference script** — `/home/z/my-project/scripts/smoke_test.sh`
    automates 2–6 and lands artifacts in `/home/z/my-project/tool-results/dbs/`.
 
-*End of skill document (v2.0.0). Produced by the six-phase distillation
+*End of skill document (v2.2.0). Produced by the six-phase distillation
 process; every claim is checkable against the repository. History: v1.0.0
 distilled the codebase at `f014842`; v2.0.0 adds remediation-pass-1
-knowledge (ADR-007/008, lessons L9–L12, resolved findings, audit history).*
+knowledge (ADR-007/008, lessons L9–L12, resolved findings, audit history);
+v2.1.0 adds the e2e layer + pass-2 parity redesign (ADR-009/010, L13);
+v2.2.0 adds ADR-011/012, the pass-3 live-site validation + remediation
+(lessons L14–L15), the CLS harness, and the SSH push tooling.*
